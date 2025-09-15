@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">FavoresApp</string>
+
+    <string name="default_web_client_id">
+    810254494187-v5146pppgtii61qlm811e8856t57qcm5.apps.googleusercontent.com
+    </string>
+</resources>

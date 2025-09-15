@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "810254494187",
+    "project_id": "favoresapp-4fe86",
+    "storage_bucket": "favoresapp-4fe86.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:810254494187:android:1e99b0e9338baa22d4d1ae",
+        "android_client_info": {
+          "package_name": "com.example.favoresapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "810254494187-sgimgok8n2pu6htmpb5mskbbg6276kvk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.favoresapp",
+            "certificate_hash": "cd0e0ac8fa81fb3d85a690d786760b78f99fbe90"
+          }
+        },
+        {
+          "client_id": "810254494187-v5146pppgtii61qlm811e8856t57qcm5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJs4CHyKRfCVqifPcxPMSUtTLbXrkP4nc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "810254494187-v5146pppgtii61qlm811e8856t57qcm5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
