@@ -71,10 +71,13 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.2.0")
 
     // Navegation
-    implementation("androidx.navigation:navigation-compose:2.7.2")
+    implementation("androidx.navigation:navigation-compose:2.9.4")
 
     //Barra de estado
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.31.5-beta")
+
+    // Coil para Jetpack Compose
+    implementation("io.coil-kt:coil-compose:2.4.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

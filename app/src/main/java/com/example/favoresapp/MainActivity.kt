@@ -1,5 +1,6 @@
 package com.example.favoresapp
 
+import ServiceListScreen
 import android.app.ActionBar.OnNavigationListener
 import com.example.favoresapp.ui.screens.LoginScreen
 import com.example.favoresapp.ui.screens.HomeScreen
@@ -24,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.favoresapp.ui.screens.EditProfileScreen
 import com.example.favoresapp.ui.screens.ProfileScreen
+import com.example.favoresapp.ui.screens.PublishServiceScreen
 import com.google.firebase.FirebaseApp
 
 
@@ -79,12 +81,10 @@ fun YourAppContent() {
         ) {
             composable("home") {
                 HomeScreen(
-                    onNavigateToPublish = { /* navegar a Publicar Trabajos */ },
-                    onNavigateToFavorList = { /* navegar a Lista de Trabajos */ },
+                    onNavigateToPublish = { navController.navigate("publishService") },
+                    onNavigateToFavorList = { navController.navigate("serviceList") },
                     onNavigateToChat = { /* navegar al Chat */ },
-                    onNavigateToProfile = {
-                        navController.navigate("profile")
-                    }
+                    onNavigateToProfile = { navController.navigate("profile") }
                 )
             }
             composable("profile") {
@@ -97,6 +97,17 @@ fun YourAppContent() {
                 EditProfileScreen(
                     onBack = { navController.popBackStack() },
                     onSaveSuccess = { navController.popBackStack() } // regresa al perfil
+                )
+            }
+            composable("publishService") {
+                PublishServiceScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaveSuccess = { navController.popBackStack() }
+                )
+            }
+            composable("serviceList") {
+                ServiceListScreen (
+                    onBack = { navController.popBackStack() }
                 )
             }
         }
