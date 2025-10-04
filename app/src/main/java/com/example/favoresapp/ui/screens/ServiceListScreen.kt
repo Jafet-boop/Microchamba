@@ -32,6 +32,12 @@ import com.example.favoresapp.ui.Model.Service
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import kotlinx.coroutines.delay
+import com.example.favoresapp.ui.Model.User
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Person
+
 
 data class ServiceStatus(
     val name: String,
@@ -449,6 +455,25 @@ fun ServiceCard(
     statusOptions: List<ServiceStatus>
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
+    var userProfile by remember { mutableStateOf<User?>(null) }
+
+    // Cargar perfil del usuario que publicó el servicio
+    LaunchedEffect(service.userId) {
+        if (service.userId.isNotEmpty()) {
+            firestore.collection("users")
+                .document(service.userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        userProfile = document.toObject(User::class.java)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("ServiceCard", "Error cargando perfil", e)
+                }
+        }
+    }
+
     val statusData = when (service.status) {
         "pendiente" -> statusOptions[0]
         "en progreso" -> statusOptions[1]
@@ -526,6 +551,93 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            //Sección de perfil del usuario que publicó
+            userProfile?.let { profile ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF8FAFC)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Avatar del usuario con inicial
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            Color(0xFF667eea),
+                                            Color(0xFF764ba2)
+                                        )
+                                    ),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = profile.fullName.firstOrNull()?.uppercase() ?: "U",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Publicado por",
+                                fontSize = 11.sp,
+                                color = Color(0xFF718096),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = profile.fullName.ifEmpty { "Usuario" },
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1A202C),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (profile.location.isNotEmpty()) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = null,
+                                        tint = Color(0xFF718096),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = profile.location,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF718096)
+                                    )
+                                }
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = Color(0xFF667eea),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // Description
             Text(
                 text = service.description,
@@ -571,7 +683,8 @@ fun ServiceCard(
             // Action buttons
             when (service.status) {
                 "pendiente" -> {
-                    if (currentUser != null) {
+                    // Solo puede aceptar si NO es el creador del servicio
+                    if (currentUser != null && currentUser.uid != service.userId) {
                         Button(
                             onClick = {
                                 firestore.collection("services")
@@ -628,9 +741,41 @@ fun ServiceCard(
                                 )
                             }
                         }
+                    } else if (currentUser?.uid == service.userId) {
+                        // Si es el creador, mostrar que está esperando
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF667eea).copy(alpha = 0.1f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    contentDescription = "Esperando",
+                                    tint = Color(0xFF667eea),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Tu servicio publicado - Esperando respuesta",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF667eea),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
                     }
                 }
                 "en progreso" -> {
+                    // Solo puede completar quien aceptó el trabajo
                     if (service.acceptedBy == currentUser?.uid) {
                         Button(
                             onClick = {
@@ -684,6 +829,7 @@ fun ServiceCard(
                             }
                         }
                     } else {
+                        // Para otros usuarios (incluyendo el creador)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
@@ -706,9 +852,14 @@ fun ServiceCard(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "Trabajo en Progreso",
+                                    text = if (currentUser?.uid == service.userId) {
+                                        "Tu servicio está siendo trabajado"
+                                    } else {
+                                        "Trabajo en Progreso"
+                                    },
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF36d1dc)
+                                    color = Color(0xFF36d1dc),
+                                    fontSize = 13.sp
                                 )
                             }
                         }
@@ -737,7 +888,7 @@ fun ServiceCard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "✅ Trabajo Completado",
+                                "Trabajo Completado",
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF34A853)
                             )
