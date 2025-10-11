@@ -7,7 +7,8 @@ data class Service(
     val price: String = "",
     val location: String = "",
     val userId: String = "",
-    val status: String = "pendiente",      // pendiente, en progreso, completado
-    val acceptedBy: String? = null,        // UID del usuario que aceptó
-    val timestamp: Long = System.currentTimeMillis() // opcional, para ordenar
+    val status: String = "pendiente",
+    val acceptedBy: String? = null,
+    val applicants: List<String> = emptyList(),
+    val timestamp: Long = System.currentTimeMillis()
 )

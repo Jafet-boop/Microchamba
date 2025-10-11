@@ -4,11 +4,9 @@ import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,10 +49,15 @@ data class ServiceStatus(
 fun ServiceListScreen(onBack: () -> Unit) {
     val firestore = FirebaseFirestore.getInstance()
     var services by remember { mutableStateOf<List<Service>>(emptyList()) }
+    var serviceDocIds by remember { mutableStateOf<Map<Service, String>>(emptyMap()) } // 🆕
     var listenerRegistration: ListenerRegistration? = null
     var selectedTab by remember { mutableStateOf(0) }
     var showContent by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+
+    // 🆕 Estado para mostrar el diálogo de postulaciones
+    var showApplicantsDialog by remember { mutableStateOf(false) }
+    var selectedService by remember { mutableStateOf<Pair<String, Service>?>(null) }
 
     val statusOptions = remember {
         listOf(
@@ -93,7 +96,18 @@ fun ServiceListScreen(onBack: () -> Unit) {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    services = snapshot.toObjects(Service::class.java)
+                    val servicesList = snapshot.toObjects(Service::class.java)
+                    val idsMap = mutableMapOf<Service, String>()
+
+                    // 🆕 Guardar el ID del documento con cada servicio
+                    snapshot.documents.forEachIndexed { index, doc ->
+                        if (index < servicesList.size) {
+                            idsMap[servicesList[index]] = doc.id
+                        }
+                    }
+
+                    services = servicesList
+                    serviceDocIds = idsMap
                     isLoading = false
                 }
             }
@@ -111,6 +125,19 @@ fun ServiceListScreen(onBack: () -> Unit) {
         1 -> services.filter { it.status == "en progreso" }
         2 -> services.filter { it.status == "completado" }
         else -> services
+    }
+
+    // 🆕 Diálogo de postulaciones
+    if (showApplicantsDialog && selectedService != null) {
+        ApplicantsDialog(
+            serviceId = selectedService!!.first,
+            service = selectedService!!.second,
+            firestore = firestore,
+            onDismiss = {
+                showApplicantsDialog = false
+                selectedService = null
+            }
+        )
     }
 
     Box(
@@ -202,7 +229,16 @@ fun ServiceListScreen(onBack: () -> Unit) {
                                     ServiceCard(
                                         service = service,
                                         firestore = firestore,
-                                        statusOptions = statusOptions
+                                        statusOptions = statusOptions,
+                                        onViewApplicants = { selectedSrv -> // 🆕
+                                            val docId = serviceDocIds[selectedSrv] ?: ""
+                                            if (docId.isNotEmpty()) {
+                                                selectedService = Pair(docId, selectedSrv)
+                                                showApplicantsDialog = true
+                                            } else {
+                                                Log.e("ServiceList", "No se encontró el ID del servicio")
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -211,6 +247,340 @@ fun ServiceListScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+// 🆕 Componente de diálogo para postulaciones
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ApplicantsDialog(
+    serviceId: String,
+    service: Service,
+    firestore: FirebaseFirestore,
+    onDismiss: () -> Unit
+) {
+    var applicants by remember { mutableStateOf<List<Pair<String, User>>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(service.applicants) {
+        if (service.applicants.isEmpty()) {
+            isLoading = false
+            return@LaunchedEffect
+        }
+
+        val loadedApplicants = mutableListOf<Pair<String, User>>()
+        var processedCount = 0
+
+        service.applicants.forEach { userId ->
+            firestore.collection("users")
+                .document(userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val user = document.toObject(User::class.java)
+                        if (user != null) {
+                            loadedApplicants.add(Pair(userId, user))
+                        }
+                    }
+                    processedCount++
+                    if (processedCount == service.applicants.size) {
+                        applicants = loadedApplicants.toList()
+                        isLoading = false
+                    }
+                }
+                .addOnFailureListener {
+                    processedCount++
+                    if (processedCount == service.applicants.size) {
+                        applicants = loadedApplicants.toList()
+                        isLoading = false
+                    }
+                }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxHeight(0.8f)
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Postulaciones",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1A202C)
+                        )
+                        Text(
+                            service.title,
+                            fontSize = 14.sp,
+                            color = Color(0xFF718096),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color(0xFF718096)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Lista de postulados
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF667eea))
+                    }
+                } else if (applicants.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.PersonSearch,
+                                contentDescription = null,
+                                tint = Color(0xFF718096),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Sin postulaciones aún",
+                                fontSize = 16.sp,
+                                color = Color(0xFF718096)
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        itemsIndexed(applicants) { _, (userId, user) ->
+                            ApplicantCardCompact(
+                                userId = userId,
+                                user = user,
+                                serviceId = serviceId,
+                                firestore = firestore,
+                                onAccepted = onDismiss
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 🆕 Tarjeta compacta de postulante
+@Composable
+private fun ApplicantCardCompact(
+    userId: String,
+    user: User,
+    serviceId: String,
+    firestore: FirebaseFirestore,
+    onAccepted: () -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
+                            ),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = user.fullName.firstOrNull()?.uppercase() ?: "U",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = user.fullName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1A202C)
+                    )
+                    if (user.location.isNotEmpty()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = Color(0xFF718096),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = user.location,
+                                fontSize = 12.sp,
+                                color = Color(0xFF718096)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (user.phone.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Phone,
+                        contentDescription = null,
+                        tint = Color(0xFF718096),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = user.phone,
+                        fontSize = 12.sp,
+                        color = Color(0xFF718096)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Button(
+                onClick = { showDialog = true },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent
+                ),
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color(0xFF34A853), Color(0xFF4CAF50))
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Aceptar",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Aceptar Postulación",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF34A853),
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Confirmar Postulación",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("¿Deseas aceptar a ${user.fullName} para realizar este trabajo?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        firestore.collection("services")
+                            .document(serviceId)
+                            .update(
+                                mapOf(
+                                    "status" to "en progreso",
+                                    "acceptedBy" to userId
+                                )
+                            )
+                            .addOnSuccessListener {
+                                Log.d("ApplicantsDialog", "Usuario aceptado correctamente")
+                                showDialog = false
+                                onAccepted()
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("ApplicantsDialog", "Error al aceptar usuario", e)
+                            }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF34A853)
+                    )
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF718096))
+                }
+            }
+        )
     }
 }
 
@@ -452,7 +822,8 @@ private fun EmptyStateSection(selectedStatus: ServiceStatus) {
 fun ServiceCard(
     service: Service,
     firestore: FirebaseFirestore,
-    statusOptions: List<ServiceStatus>
+    statusOptions: List<ServiceStatus>,
+    onViewApplicants: (Service) -> Unit = {} // 🆕 Callback para ver postulaciones
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
@@ -680,31 +1051,15 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Action buttons
+            // 🆕 Action buttons con sistema de postulaciones
             when (service.status) {
                 "pendiente" -> {
-                    // Solo puede aceptar si NO es el creador del servicio
-                    if (currentUser != null && currentUser.uid != service.userId) {
+                    if (currentUser?.uid == service.userId) {
+                        // Si es el creador, mostrar botón para ver postulaciones
+                        val applicantCount = service.applicants.size
+
                         Button(
-                            onClick = {
-                                firestore.collection("services")
-                                    .whereEqualTo("title", service.title)
-                                    .whereEqualTo("userId", service.userId)
-                                    .get()
-                                    .addOnSuccessListener { snapshot ->
-                                        if (!snapshot.isEmpty) {
-                                            val docId = snapshot.documents[0].id
-                                            firestore.collection("services")
-                                                .document(docId)
-                                                .update(
-                                                    mapOf(
-                                                        "status" to "en progreso",
-                                                        "acceptedBy" to currentUser.uid
-                                                    )
-                                                )
-                                        }
-                                    }
-                            },
+                            onClick = { onViewApplicants(service) },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
                             ),
@@ -728,48 +1083,113 @@ fun ServiceCard(
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
-                                    Icons.Default.CheckBox,
-                                    contentDescription = "Aceptar",
+                                    Icons.Default.People,
+                                    contentDescription = "Ver postulaciones",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "Aceptar Trabajo",
+                                    "Ver Postulaciones ($applicantCount)",
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             }
                         }
-                    } else if (currentUser?.uid == service.userId) {
-                        // Si es el creador, mostrar que está esperando
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF667eea).copy(alpha = 0.1f)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(
+                    } else {
+                        // Si NO es el creador, puede postularse
+                        val hasApplied = service.applicants.contains(currentUser?.uid)
+
+                        if (hasApplied) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFF667eea).copy(alpha = 0.1f)
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = "Ya postulado",
+                                        tint = Color(0xFF667eea),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Ya te postulaste a este trabajo",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF667eea),
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    // Agregar postulación
+                                    if (currentUser != null) {
+                                        val updatedApplicants = service.applicants.toMutableList()
+                                        updatedApplicants.add(currentUser.uid)
+
+                                        firestore.collection("services")
+                                            .whereEqualTo("title", service.title)
+                                            .whereEqualTo("userId", service.userId)
+                                            .get()
+                                            .addOnSuccessListener { snapshot ->
+                                                if (!snapshot.isEmpty) {
+                                                    val docId = snapshot.documents[0].id
+                                                    firestore.collection("services")
+                                                        .document(docId)
+                                                        .update("applicants", updatedApplicants)
+                                                        .addOnSuccessListener {
+                                                            Log.d("ServiceCard", "Postulación exitosa")
+                                                        }
+                                                }
+                                            }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent
+                                ),
+                                contentPadding = PaddingValues(0.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(
+                                                Color(0xFF667eea),
+                                                Color(0xFF764ba2)
+                                            )
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clip(RoundedCornerShape(12.dp))
                             ) {
-                                Icon(
-                                    Icons.Default.Schedule,
-                                    contentDescription = "Esperando",
-                                    tint = Color(0xFF667eea),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    "Tu servicio publicado - Esperando respuesta",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF667eea),
-                                    fontSize = 13.sp
-                                )
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.WorkOutline,
+                                        contentDescription = "Postularme",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        "Postularme al Trabajo",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
                             }
                         }
                     }
