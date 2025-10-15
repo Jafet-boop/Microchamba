@@ -1,4 +1,3 @@
-
 package com.example.favoresapp.ui.screens
 
 import android.util.Log
@@ -52,8 +51,8 @@ data class ServiceStatus(
 @Composable
 fun ServiceListScreen(onBack: () -> Unit) {
     val firestore = FirebaseFirestore.getInstance()
-    var services by remember { mutableStateOf<List<Service>>(emptyList()) }
-    var serviceDocIds by remember { mutableStateOf<Map<Service, String>>(emptyMap()) } // 🆕
+    var allServices by remember { mutableStateOf<List<Service>>(emptyList()) } // 🆕 Todos los servicios
+    var serviceDocIds by remember { mutableStateOf<Map<Service, String>>(emptyMap()) }
     var listenerRegistration: ListenerRegistration? = null
     var selectedTab by remember { mutableIntStateOf(0) }
     var showContent by remember { mutableStateOf(false) }
@@ -61,15 +60,13 @@ fun ServiceListScreen(onBack: () -> Unit) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var searchQuery by remember { mutableStateOf("") }
 
-
-    // 🆕 Estado para mostrar el diálogo de postulaciones
     var showApplicantsDialog by remember { mutableStateOf(false) }
     var selectedService by remember { mutableStateOf<Pair<String, Service>?>(null) }
 
     val statusOptions = remember {
         listOf(
             ServiceStatus(
-                "Pendientes",
+                "Pendiente",
                 Color(0xFF667eea),
                 Icons.Default.Schedule,
                 listOf(Color(0xFF667eea), Color(0xFF764ba2))
@@ -81,40 +78,24 @@ fun ServiceListScreen(onBack: () -> Unit) {
                 listOf(Color(0xFF36d1dc), Color(0xFF5b86e5))
             ),
             ServiceStatus(
-                "Completadas",
+                "Completado",
                 Color(0xFF34A853),
                 Icons.Default.CheckCircle,
                 listOf(Color(0xFF34A853), Color(0xFF4CAF50))
             )
         )
     }
-    val categories = listOf("Hogar", "Mandados", "Mascotas", "Ayuda Profesional", "Otros")
-    // Escucha en tiempo real
-    LaunchedEffect(selectedCategory, selectedTab, searchQuery) {
+    val categories = listOf("Hogar", "Educación", "Tecnología", "Salud", "Transporte")
+
+    // 🆕 Escucha TODOS los servicios sin filtro de estado
+    LaunchedEffect(Unit) {
         delay(200)
         showContent = true
         isLoading = true
 
-        var query: Query = firestore.collection("services")
-
-        // Filtro por estado
-        val statusFilter = when (selectedTab) {
-            0 -> "pendiente"
-            1 -> "en progreso"
-            2 -> "completado"
-            else -> null
-        }
-        if (statusFilter != null) {
-            query = query.whereEqualTo("status", statusFilter)
-        }
-
-        // Filtro por categoría
-        if (selectedCategory != null) {
-            query = query.whereEqualTo("category", selectedCategory)
-        }
-        // Listener
         listenerRegistration?.remove()
-        listenerRegistration = query.orderBy("timestamp", Query.Direction.DESCENDING)
+        listenerRegistration = firestore.collection("services")
+            .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.e("Firestore", "Error obteniendo servicios", e)
@@ -130,23 +111,13 @@ fun ServiceListScreen(onBack: () -> Unit) {
                             idsMap[servicesList[index]] = doc.id
                         }
                     }
-                    // Filtro por búsqueda (en cliente)
-                    val filteredList = if (searchQuery.isNotBlank()) {
-                        servicesList.filter {
-                            it.title.contains(searchQuery, ignoreCase = true) ||
-                                    it.description.contains(searchQuery, ignoreCase = true)
-                        }
-                    } else {
-                        servicesList
-                    }
 
-                    services = filteredList
+                    allServices = servicesList
                     serviceDocIds = idsMap
                     isLoading = false
                 }
             }
     }
-
 
     DisposableEffect(Unit) {
         onDispose {
@@ -154,15 +125,34 @@ fun ServiceListScreen(onBack: () -> Unit) {
         }
     }
 
-    // Filtrar servicios según la pestaña
-    val filteredServices = when (selectedTab) {
-        0 -> services.filter { it.status == "pendiente" }
-        1 -> services.filter { it.status == "en progreso" }
-        2 -> services.filter { it.status == "completado" }
-        else -> services
+    // 🆕 Filtrar servicios en el cliente
+    val filteredServices = remember(allServices, selectedTab, selectedCategory, searchQuery) {
+        var filtered = allServices
+
+        // Filtro por estado
+        filtered = when (selectedTab) {
+            0 -> filtered.filter { it.status == "pendiente" }
+            1 -> filtered.filter { it.status == "en progreso" }
+            2 -> filtered.filter { it.status == "completado" }
+            else -> filtered
+        }
+
+        // Filtro por categoría
+        if (selectedCategory != null) {
+            filtered = filtered.filter { it.category == selectedCategory }
+        }
+
+        // Filtro por búsqueda
+        if (searchQuery.isNotBlank()) {
+            filtered = filtered.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                        it.description.contains(searchQuery, ignoreCase = true)
+            }
+        }
+
+        filtered
     }
 
-    // 🆕 Diálogo de postulaciones
     if (showApplicantsDialog && selectedService != null) {
         ApplicantsDialog(
             serviceId = selectedService!!.first,
@@ -187,7 +177,6 @@ fun ServiceListScreen(onBack: () -> Unit) {
                 )
             )
     ) {
-        // Custom Top Bar
         AnimatedVisibility(
             visible = showContent,
             enter = fadeIn(animationSpec = tween(600)) +
@@ -196,10 +185,9 @@ fun ServiceListScreen(onBack: () -> Unit) {
                         initialOffsetY = { -it }
                     )
         ) {
-            CustomTopBar(onBack = onBack, totalServices = services.size)
+            CustomTopBar(onBack = onBack, totalServices = allServices.size)
         }
 
-        // Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -207,7 +195,6 @@ fun ServiceListScreen(onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Tab Section
             AnimatedVisibility(
                 visible = showContent,
                 enter = fadeIn(animationSpec = tween(800, delayMillis = 200)) +
@@ -217,12 +204,10 @@ fun ServiceListScreen(onBack: () -> Unit) {
                         )
             ) {
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    // Search and Filter UI
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Search TextField
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
@@ -234,7 +219,6 @@ fun ServiceListScreen(onBack: () -> Unit) {
                             shape = RoundedCornerShape(12.dp)
                         )
 
-                        // Category Filter Dropdown
                         var expanded by remember { mutableStateOf(false) }
                         Box {
                             OutlinedButton(
@@ -271,14 +255,13 @@ fun ServiceListScreen(onBack: () -> Unit) {
                         selectedTab = selectedTab,
                         onTabSelected = { selectedTab = it },
                         statusOptions = statusOptions,
-                        services = services
+                        allServices = allServices // 🆕 Pasar TODOS los servicios
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Services List
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -319,7 +302,7 @@ fun ServiceListScreen(onBack: () -> Unit) {
                                         serviceId = docId,
                                         firestore = firestore,
                                         statusOptions = statusOptions,
-                                        onViewApplicants = { selectedSrv -> // 🆕
+                                        onViewApplicants = { selectedSrv ->
                                             val id = serviceDocIds[selectedSrv] ?: ""
                                             if (id.isNotEmpty()) {
                                                 selectedService = Pair(id, selectedSrv)
@@ -339,7 +322,6 @@ fun ServiceListScreen(onBack: () -> Unit) {
     }
 }
 
-// 🆕 Componente de diálogo para postulaciones
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplicantsDialog(
@@ -400,7 +382,6 @@ fun ApplicantsDialog(
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -433,7 +414,6 @@ fun ApplicantsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Lista de postulados
                 if (isLoading) {
                     Box(
                         modifier = Modifier
@@ -486,7 +466,6 @@ fun ApplicantsDialog(
     }
 }
 
-// 🆕 Tarjeta compacta de postulante
 @Composable
 private fun ApplicantCardCompact(
     userId: String,
@@ -757,7 +736,7 @@ private fun CustomTabSection(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     statusOptions: List<ServiceStatus>,
-    services: List<Service>
+    allServices: List<Service> // 🆕 Recibe TODOS los servicios
 ) {
     Card(
         modifier = Modifier
@@ -778,10 +757,11 @@ private fun CustomTabSection(
         ) {
             statusOptions.forEachIndexed { index, status ->
                 val isSelected = selectedTab == index
+                // 🆕 Contar sobre TODOS los servicios, no sobre filtrados
                 val serviceCount = when (index) {
-                    0 -> services.count { it.status == "pendiente" }
-                    1 -> services.count { it.status == "en progreso" }
-                    2 -> services.count { it.status == "completado" }
+                    0 -> allServices.count { it.status == "pendiente" }
+                    1 -> allServices.count { it.status == "en progreso" }
+                    2 -> allServices.count { it.status == "completado" }
                     else -> 0
                 }
 
@@ -792,7 +772,7 @@ private fun CustomTabSection(
                         .clickable { onTabSelected(index) },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) Color.Transparent else Color.Transparent
+                        containerColor = Color.Transparent
                     )
                 ) {
                     Box(
@@ -811,7 +791,7 @@ private fun CustomTabSection(
                                 },
                                 shape = RoundedCornerShape(16.dp)
                             )
-                            .padding(12.dp),
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -825,12 +805,15 @@ private fun CustomTabSection(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = status.name.split(" ").first(),
-                                fontSize = 12.sp,
+                                text = status.name,
+                                fontSize = 11.sp, // 🆕 Texto más pequeño
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else Color(0xFF718096),
-                                maxLines = 1
+                                maxLines = 2, // 🆕 Permite 2 líneas
+                                overflow = TextOverflow.Ellipsis,
+                                lineHeight = 12.sp // 🆕 Altura de línea ajustada
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "$serviceCount",
                                 fontSize = 14.sp,
@@ -912,12 +895,11 @@ fun ServiceCard(
     serviceId: String,
     firestore: FirebaseFirestore,
     statusOptions: List<ServiceStatus>,
-    onViewApplicants: (Service) -> Unit = {} // 🆕 Callback para ver postulaciones
+    onViewApplicants: (Service) -> Unit = {}
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
 
-    // Cargar perfil del usuario que publicó el servicio
     LaunchedEffect(service.userId) {
         if (service.userId.isNotEmpty()) {
             firestore.collection("users")
@@ -956,7 +938,6 @@ fun ServiceCard(
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
-            // Header with status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1011,7 +992,6 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            //Sección de perfil del usuario que publicó
             userProfile?.let { profile ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -1026,7 +1006,6 @@ fun ServiceCard(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Avatar del usuario con inicial
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -1098,7 +1077,6 @@ fun ServiceCard(
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Description
             Text(
                 text = service.description,
                 fontSize = 14.sp,
@@ -1109,7 +1087,6 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Service details
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1140,11 +1117,9 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 🆕 Action buttons con sistema de postulaciones
             when (service.status) {
                 "pendiente" -> {
                     if (currentUser?.uid == service.userId) {
-                        // Si es el creador, mostrar botón para ver postulaciones
                         val applicantCount = service.applicants.size
 
                         Button(
@@ -1186,7 +1161,6 @@ fun ServiceCard(
                             }
                         }
                     } else {
-                        // Si NO es el creador, puede postularse
                         val hasApplied = service.applicants.contains(currentUser?.uid)
 
                         if (hasApplied) {
@@ -1223,19 +1197,16 @@ fun ServiceCard(
                             Button(
                                 onClick = {
                                     if (currentUser != null && serviceId.isNotEmpty()) {
-                                        // 1. Obtener el nombre del postulante
                                         firestore.collection("users").document(currentUser.uid).get()
                                             .addOnSuccessListener { userDoc ->
                                                 val senderName = userDoc.getString("fullName") ?: "Alguien"
 
-                                                // 2. Actualizar la lista de postulantes en el servicio
                                                 val updatedApplicants = service.applicants.toMutableList().apply { add(currentUser.uid) }
                                                 firestore.collection("services").document(serviceId)
                                                     .update("applicants", updatedApplicants)
                                                     .addOnSuccessListener {
                                                         Log.d("ServiceCard", "Postulación exitosa")
 
-                                                        // 3. Crear la notificación para el dueño del servicio
                                                         val notification = Notification(
                                                             recipientId = service.userId,
                                                             senderId = currentUser.uid,
@@ -1301,7 +1272,6 @@ fun ServiceCard(
                     }
                 }
                 "en progreso" -> {
-                    // Solo puede completar quien aceptó el trabajo
                     if (service.acceptedBy == currentUser?.uid) {
                         Button(
                             onClick = {
@@ -1348,7 +1318,6 @@ fun ServiceCard(
                             }
                         }
                     } else {
-                        // Para otros usuarios (incluyendo el creador)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(

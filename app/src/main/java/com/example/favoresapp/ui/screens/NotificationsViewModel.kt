@@ -10,14 +10,16 @@ import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class NotificationsViewModel : ViewModel() {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val currentUser = FirebaseAuth.getInstance().currentUser
 
-    private val _notifications = MutableStateFlow<List<Notification>>(emptyList())
-    val notifications: StateFlow<List<Notification>> = _notifications
+    // Cambia esto para usar un Map<String, Notification>
+    private val _notifications = MutableStateFlow<Map<String, Notification>>(emptyMap())
+    val notifications: StateFlow<Map<String, Notification>> = _notifications
 
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount
@@ -40,9 +42,12 @@ class NotificationsViewModel : ViewModel() {
                     }
 
                     if (snapshot != null) {
-                        val notificationList = snapshot.toObjects(Notification::class.java)
-                        _notifications.value = notificationList
-                        _unreadCount.value = notificationList.count { !it.isRead }
+                        // Guarda como Map donde la key es el ID del documento
+                        val notificationMap = snapshot.documents.associate { doc ->
+                            doc.id to doc.toObject(Notification::class.java)!!
+                        }
+                        _notifications.value = notificationMap
+                        _unreadCount.value = notificationMap.values.count { !it.isRead }
                     }
                 }
         }
@@ -50,14 +55,15 @@ class NotificationsViewModel : ViewModel() {
 
     fun markAsRead(notificationId: String) {
         viewModelScope.launch {
-            firestore.collection("notifications").document(notificationId)
-                .update("isRead", true)
-                .addOnSuccessListener {
-                    Log.d("NotificationsViewModel", "Notification marked as read")
-                }
-                .addOnFailureListener { e ->
-                    Log.e("NotificationsViewModel", "Error marking notification as read", e)
-                }
+            try {
+                firestore.collection("notifications")
+                    .document(notificationId)
+                    .update("isRead", true)
+                    .await()
+                Log.d("NotificationsViewModel", "Notification marked as read")
+            } catch (e: Exception) {
+                Log.e("NotificationsViewModel", "Error marking notification as read", e)
+            }
         }
     }
 }

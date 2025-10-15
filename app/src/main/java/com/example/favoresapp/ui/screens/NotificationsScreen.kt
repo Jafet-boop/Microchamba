@@ -30,7 +30,7 @@ fun NotificationsScreen(
     onBack: () -> Unit,
     notificationsViewModel: NotificationsViewModel = viewModel()
 ) {
-    val notifications by notificationsViewModel.notifications.collectAsState()
+    val notificationsMap by notificationsViewModel.notifications.collectAsState()
 
     Box(
         modifier = Modifier
@@ -49,7 +49,7 @@ fun NotificationsScreen(
                 .fillMaxSize()
         ) {
             NotificationsTopBar(onBack = onBack)
-            if (notifications.isEmpty()) {
+            if (notificationsMap.isEmpty()) {
                 EmptyNotificationsView()
             } else {
                 LazyColumn(
@@ -57,12 +57,12 @@ fun NotificationsScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(notifications) { notification ->
+                    items(notificationsMap.entries.toList()) { (documentId, notification) ->
                         NotificationItem(
                             notification = notification,
                             onClick = {
                                 if (!notification.isRead) {
-                                    notificationsViewModel.markAsRead(notification.id)
+                                    notificationsViewModel.markAsRead(documentId)
                                 }
                             }
                         )
