@@ -29,6 +29,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.example.favoresapp.ui.Model.Service
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.delay
 import com.example.favoresapp.ui.Model.User
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +55,9 @@ fun ServiceListScreen(onBack: () -> Unit) {
     var selectedTab by remember { mutableStateOf(0) }
     var showContent by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
 
     // 🆕 Estado para mostrar el diálogo de postulaciones
     var showApplicantsDialog by remember { mutableStateOf(false) }
@@ -81,14 +85,33 @@ fun ServiceListScreen(onBack: () -> Unit) {
             )
         )
     }
-
+    val categories = listOf("Hogar", "Mandados", "Mascotas", "Ayuda Profesional", "Otros")
     // Escucha en tiempo real
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedCategory, selectedTab, searchQuery) {
         delay(200)
         showContent = true
+        isLoading = true
 
-        listenerRegistration = firestore.collection("services")
-            .orderBy("timestamp")
+        var query: Query = firestore.collection("services")
+
+        // Filtro por estado
+        val statusFilter = when (selectedTab) {
+            0 -> "pendiente"
+            1 -> "en progreso"
+            2 -> "completado"
+            else -> null
+        }
+        if (statusFilter != null) {
+            query = query.whereEqualTo("status", statusFilter)
+        }
+
+        // Filtro por categoría
+        if (selectedCategory != null) {
+            query = query.whereEqualTo("category", selectedCategory)
+        }
+        // Listener
+        listenerRegistration?.remove()
+        listenerRegistration = query.orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.e("Firestore", "Error obteniendo servicios", e)
@@ -99,19 +122,28 @@ fun ServiceListScreen(onBack: () -> Unit) {
                     val servicesList = snapshot.toObjects(Service::class.java)
                     val idsMap = mutableMapOf<Service, String>()
 
-                    // 🆕 Guardar el ID del documento con cada servicio
                     snapshot.documents.forEachIndexed { index, doc ->
                         if (index < servicesList.size) {
                             idsMap[servicesList[index]] = doc.id
                         }
                     }
+                    // Filtro por búsqueda (en cliente)
+                    val filteredList = if (searchQuery.isNotBlank()) {
+                        servicesList.filter {
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                                    it.description.contains(searchQuery, ignoreCase = true)
+                        }
+                    } else {
+                        servicesList
+                    }
 
-                    services = servicesList
+                    services = filteredList
                     serviceDocIds = idsMap
                     isLoading = false
                 }
             }
     }
+
 
     DisposableEffect(Unit) {
         onDispose {
@@ -181,12 +213,64 @@ fun ServiceListScreen(onBack: () -> Unit) {
                             initialOffsetY = { it / 2 }
                         )
             ) {
-                CustomTabSection(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    statusOptions = statusOptions,
-                    services = services
-                )
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    // Search and Filter UI
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Search TextField
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            label = { Text("Buscar...") },
+                            modifier = Modifier.weight(1f),
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = "Buscar")
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Category Filter Dropdown
+                        var expanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedButton(
+                                onClick = { expanded = true },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.FilterList, contentDescription = "Categoría")
+                            }
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Todas") },
+                                    onClick = {
+                                        selectedCategory = null
+                                        expanded = false
+                                    }
+                                )
+                                categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category) },
+                                        onClick = {
+                                            selectedCategory = category
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CustomTabSection(
+                        selectedTab = selectedTab,
+                        onTabSelected = { selectedTab = it },
+                        statusOptions = statusOptions,
+                        services = services
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -673,7 +757,6 @@ private fun CustomTabSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(20.dp)
