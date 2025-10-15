@@ -1,3 +1,4 @@
+
 package com.example.favoresapp.ui.screens
 
 import androidx.compose.animation.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 data class BottomNavItem(
@@ -41,7 +43,8 @@ fun HomeScreen(
     onNavigateToPublish: () -> Unit = {},
     onNavigateToFavorList: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {}
 ) {
     var showContent by remember { mutableStateOf(false) }
 
@@ -109,7 +112,7 @@ fun HomeScreen(
                             initialOffsetY = { -it / 3 }
                         )
             ) {
-                HeaderSection()
+                HeaderSection(onNavigateToNotifications = onNavigateToNotifications)
             }
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -158,24 +161,50 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HeaderSection() {
-    Column {
-        Text(
-            text = "¡Hola! 👋",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A202C)
-        )
+private fun HeaderSection(
+    onNavigateToNotifications: () -> Unit,
+    notificationsViewModel: NotificationsViewModel = viewModel()
+) {
+    val unreadCount by notificationsViewModel.unreadCount.collectAsState()
 
-        Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column {
+            Text(
+                text = "¡Hola! 👋",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A202C)
+            )
 
-        Text(
-            text = "¿Cómo puedes ayudar hoy?",
-            fontSize = 18.sp,
-            color = Color(0xFF718096),
-            fontWeight = FontWeight.Medium
-        )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "¿Cómo puedes ayudar hoy?",
+                fontSize = 18.sp,
+                color = Color(0xFF718096),
+                fontWeight = FontWeight.Medium
+            )
+        }
+        BadgedBox(
+            badge = {
+                if (unreadCount > 0) {
+                    Badge { Text("$unreadCount") }
+                }
+            }
+        ) {
+            IconButton(onClick = onNavigateToNotifications) {
+                Icon(
+                    Icons.Default.Notifications,
+                    contentDescription = "Notificaciones"
+                )
+            }
+        }
     }
 }
 

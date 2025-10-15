@@ -1,3 +1,4 @@
+
 package com.example.favoresapp
 
 import android.app.ActionBar.OnNavigationListener
@@ -23,6 +24,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.favoresapp.ui.screens.EditProfileScreen
+import com.example.favoresapp.ui.screens.NotificationsScreen
 import com.example.favoresapp.ui.screens.ProfileScreen
 import com.example.favoresapp.ui.screens.PublishServiceScreen
 import com.example.favoresapp.ui.screens.ServiceListScreen
@@ -84,7 +86,8 @@ fun YourAppContent() {
                     onNavigateToPublish = { navController.navigate("publishService") },
                     onNavigateToFavorList = { navController.navigate("serviceList") },
                     onNavigateToChat = { /* navegar al Chat */ },
-                    onNavigateToProfile = { navController.navigate("profile") }
+                    onNavigateToProfile = { navController.navigate("profile") },
+                    onNavigateToNotifications = { navController.navigate("notifications") }
                 )
             }
             composable("profile") {
@@ -107,6 +110,11 @@ fun YourAppContent() {
             }
             composable("serviceList") {
                 ServiceListScreen (
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("notifications") {
+                NotificationsScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

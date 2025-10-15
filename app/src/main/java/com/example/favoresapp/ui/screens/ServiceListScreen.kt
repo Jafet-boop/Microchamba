@@ -1,3 +1,4 @@
+
 package com.example.favoresapp.ui.screens
 
 import android.util.Log
@@ -28,7 +29,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.example.favoresapp.ui.Model.Service
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import com.example.favoresapp.ui.Model.Notification
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.delay
 import com.example.favoresapp.ui.Model.User
 import androidx.compose.runtime.LaunchedEffect
@@ -51,9 +55,12 @@ fun ServiceListScreen(onBack: () -> Unit) {
     var services by remember { mutableStateOf<List<Service>>(emptyList()) }
     var serviceDocIds by remember { mutableStateOf<Map<Service, String>>(emptyMap()) } // 🆕
     var listenerRegistration: ListenerRegistration? = null
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     var showContent by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
 
     // 🆕 Estado para mostrar el diálogo de postulaciones
     var showApplicantsDialog by remember { mutableStateOf(false) }
@@ -81,14 +88,33 @@ fun ServiceListScreen(onBack: () -> Unit) {
             )
         )
     }
-
+    val categories = listOf("Hogar", "Mandados", "Mascotas", "Ayuda Profesional", "Otros")
     // Escucha en tiempo real
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedCategory, selectedTab, searchQuery) {
         delay(200)
         showContent = true
+        isLoading = true
 
-        listenerRegistration = firestore.collection("services")
-            .orderBy("timestamp")
+        var query: Query = firestore.collection("services")
+
+        // Filtro por estado
+        val statusFilter = when (selectedTab) {
+            0 -> "pendiente"
+            1 -> "en progreso"
+            2 -> "completado"
+            else -> null
+        }
+        if (statusFilter != null) {
+            query = query.whereEqualTo("status", statusFilter)
+        }
+
+        // Filtro por categoría
+        if (selectedCategory != null) {
+            query = query.whereEqualTo("category", selectedCategory)
+        }
+        // Listener
+        listenerRegistration?.remove()
+        listenerRegistration = query.orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
                     Log.e("Firestore", "Error obteniendo servicios", e)
@@ -99,19 +125,28 @@ fun ServiceListScreen(onBack: () -> Unit) {
                     val servicesList = snapshot.toObjects(Service::class.java)
                     val idsMap = mutableMapOf<Service, String>()
 
-                    // 🆕 Guardar el ID del documento con cada servicio
                     snapshot.documents.forEachIndexed { index, doc ->
                         if (index < servicesList.size) {
                             idsMap[servicesList[index]] = doc.id
                         }
                     }
+                    // Filtro por búsqueda (en cliente)
+                    val filteredList = if (searchQuery.isNotBlank()) {
+                        servicesList.filter {
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                                    it.description.contains(searchQuery, ignoreCase = true)
+                        }
+                    } else {
+                        servicesList
+                    }
 
-                    services = servicesList
+                    services = filteredList
                     serviceDocIds = idsMap
                     isLoading = false
                 }
             }
     }
+
 
     DisposableEffect(Unit) {
         onDispose {
@@ -181,12 +216,64 @@ fun ServiceListScreen(onBack: () -> Unit) {
                             initialOffsetY = { it / 2 }
                         )
             ) {
-                CustomTabSection(
-                    selectedTab = selectedTab,
-                    onTabSelected = { selectedTab = it },
-                    statusOptions = statusOptions,
-                    services = services
-                )
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    // Search and Filter UI
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Search TextField
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            label = { Text("Buscar...") },
+                            modifier = Modifier.weight(1f),
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = "Buscar")
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Category Filter Dropdown
+                        var expanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedButton(
+                                onClick = { expanded = true },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.FilterList, contentDescription = "Categoría")
+                            }
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Todas") },
+                                    onClick = {
+                                        selectedCategory = null
+                                        expanded = false
+                                    }
+                                )
+                                categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category) },
+                                        onClick = {
+                                            selectedCategory = category
+                                            expanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CustomTabSection(
+                        selectedTab = selectedTab,
+                        onTabSelected = { selectedTab = it },
+                        statusOptions = statusOptions,
+                        services = services
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -226,14 +313,16 @@ fun ServiceListScreen(onBack: () -> Unit) {
                                         initialOffsetY = { it / 2 }
                                     )
                                 ) {
+                                    val docId = serviceDocIds[service] ?: ""
                                     ServiceCard(
                                         service = service,
+                                        serviceId = docId,
                                         firestore = firestore,
                                         statusOptions = statusOptions,
                                         onViewApplicants = { selectedSrv -> // 🆕
-                                            val docId = serviceDocIds[selectedSrv] ?: ""
-                                            if (docId.isNotEmpty()) {
-                                                selectedService = Pair(docId, selectedSrv)
+                                            val id = serviceDocIds[selectedSrv] ?: ""
+                                            if (id.isNotEmpty()) {
+                                                selectedService = Pair(id, selectedSrv)
                                                 showApplicantsDialog = true
                                             } else {
                                                 Log.e("ServiceList", "No se encontró el ID del servicio")
@@ -298,7 +387,7 @@ fun ApplicantsDialog(
         }
     }
 
-    AlertDialog(
+    BasicAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxHeight(0.8f)
     ) {
@@ -616,7 +705,7 @@ private fun CustomTopBar(
                     )
             ) {
                 Icon(
-                    Icons.Default.ArrowBack,
+                    Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Volver",
                     tint = Color(0xFF667eea)
                 )
@@ -673,7 +762,6 @@ private fun CustomTabSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(20.dp)
@@ -821,6 +909,7 @@ private fun EmptyStateSection(selectedStatus: ServiceStatus) {
 @Composable
 fun ServiceCard(
     service: Service,
+    serviceId: String,
     firestore: FirebaseFirestore,
     statusOptions: List<ServiceStatus>,
     onViewApplicants: (Service) -> Unit = {} // 🆕 Callback para ver postulaciones
@@ -1133,25 +1222,42 @@ fun ServiceCard(
                         } else {
                             Button(
                                 onClick = {
-                                    // Agregar postulación
-                                    if (currentUser != null) {
-                                        val updatedApplicants = service.applicants.toMutableList()
-                                        updatedApplicants.add(currentUser.uid)
+                                    if (currentUser != null && serviceId.isNotEmpty()) {
+                                        // 1. Obtener el nombre del postulante
+                                        firestore.collection("users").document(currentUser.uid).get()
+                                            .addOnSuccessListener { userDoc ->
+                                                val senderName = userDoc.getString("fullName") ?: "Alguien"
 
-                                        firestore.collection("services")
-                                            .whereEqualTo("title", service.title)
-                                            .whereEqualTo("userId", service.userId)
-                                            .get()
-                                            .addOnSuccessListener { snapshot ->
-                                                if (!snapshot.isEmpty) {
-                                                    val docId = snapshot.documents[0].id
-                                                    firestore.collection("services")
-                                                        .document(docId)
-                                                        .update("applicants", updatedApplicants)
-                                                        .addOnSuccessListener {
-                                                            Log.d("ServiceCard", "Postulación exitosa")
-                                                        }
-                                                }
+                                                // 2. Actualizar la lista de postulantes en el servicio
+                                                val updatedApplicants = service.applicants.toMutableList().apply { add(currentUser.uid) }
+                                                firestore.collection("services").document(serviceId)
+                                                    .update("applicants", updatedApplicants)
+                                                    .addOnSuccessListener {
+                                                        Log.d("ServiceCard", "Postulación exitosa")
+
+                                                        // 3. Crear la notificación para el dueño del servicio
+                                                        val notification = Notification(
+                                                            recipientId = service.userId,
+                                                            senderId = currentUser.uid,
+                                                            senderName = senderName,
+                                                            serviceId = serviceId,
+                                                            serviceTitle = service.title,
+                                                            type = "new_applicant"
+                                                        )
+                                                        firestore.collection("notifications").add(notification)
+                                                            .addOnSuccessListener {
+                                                                Log.d("ServiceCard", "Notificación creada exitosamente")
+                                                            }
+                                                            .addOnFailureListener { e ->
+                                                                Log.e("ServiceCard", "Error al crear notificación", e)
+                                                            }
+                                                    }
+                                                    .addOnFailureListener { e ->
+                                                        Log.e("ServiceCard", "Error al postularse", e)
+                                                    }
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Log.e("ServiceCard", "Error al obtener nombre del postulante", e)
                                             }
                                     }
                                 },
@@ -1199,18 +1305,11 @@ fun ServiceCard(
                     if (service.acceptedBy == currentUser?.uid) {
                         Button(
                             onClick = {
-                                firestore.collection("services")
-                                    .whereEqualTo("title", service.title)
-                                    .whereEqualTo("userId", service.userId)
-                                    .get()
-                                    .addOnSuccessListener { snapshot ->
-                                        if (!snapshot.isEmpty) {
-                                            val docId = snapshot.documents[0].id
-                                            firestore.collection("services")
-                                                .document(docId)
-                                                .update("status", "completado")
-                                        }
-                                    }
+                                if (serviceId.isNotEmpty()) {
+                                    firestore.collection("services")
+                                        .document(serviceId)
+                                        .update("status", "completado")
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
