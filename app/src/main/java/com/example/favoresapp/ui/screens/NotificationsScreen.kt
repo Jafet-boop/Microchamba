@@ -1,6 +1,6 @@
 package com.example.favoresapp.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -57,7 +57,14 @@ fun NotificationsScreen(
                 }
             } else {
                 items(notifications) { notification ->
-                    NotificationItem(notification)
+                    NotificationItem(
+                        notification = notification,
+                        onClick = {
+                            if (!notification.isRead) {
+                                notificationsViewModel.markAsRead(notification.id)
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -65,9 +72,11 @@ fun NotificationsScreen(
 }
 
 @Composable
-fun NotificationItem(notification: Notification) {
+fun NotificationItem(notification: Notification, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
             containerColor = if (notification.isRead) Color.White else Color(0xFFE7F0FD)
         ),
