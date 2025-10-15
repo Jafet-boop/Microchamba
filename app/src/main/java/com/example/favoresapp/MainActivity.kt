@@ -1,7 +1,6 @@
 
 package com.example.favoresapp
 
-import android.app.ActionBar.OnNavigationListener
 import com.example.favoresapp.ui.screens.LoginScreen
 import com.example.favoresapp.ui.screens.HomeScreen
 import android.os.Bundle
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.systemBars
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import androidx.compose.runtime.SideEffect
 import androidx.navigation.compose.*
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.favoresapp.ui.screens.EditProfileScreen

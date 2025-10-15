@@ -1,9 +1,11 @@
 package com.example.favoresapp.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -12,8 +14,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,47 +32,69 @@ fun NotificationsScreen(
 ) {
     val notifications by notificationsViewModel.notifications.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Notificaciones") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFF8FAFC),
+                        Color(0xFFE2E8F0)
+                    )
+                )
             )
-        }
-    ) { paddingValues ->
-        LazyColumn(
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            NotificationsTopBar(onBack = onBack)
             if (notifications.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier.fillParentMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No tienes notificaciones.")
-                    }
-                }
+                EmptyNotificationsView()
             } else {
-                items(notifications) { notification ->
-                    NotificationItem(
-                        notification = notification,
-                        onClick = {
-                            if (!notification.isRead) {
-                                notificationsViewModel.markAsRead(notification.id)
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(notifications) { notification ->
+                        NotificationItem(
+                            notification = notification,
+                            onClick = {
+                                if (!notification.isRead) {
+                                    notificationsViewModel.markAsRead(notification.id)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NotificationsTopBar(onBack: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Volver",
+                tint = Color(0xFF1A202C)
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = "Notificaciones",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1A202C)
+        )
     }
 }
 
@@ -76,24 +103,49 @@ fun NotificationItem(notification: Notification, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(20.dp),
+                ambientColor = Color.Black.copy(alpha = 0.08f)
+            )
             .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (notification.isRead) Color.White else Color(0xFFE7F0FD)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            containerColor = if (notification.isRead) Color.White.copy(alpha = 0.9f) else Color(0xFFE7F0FD)
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = "Nueva postulación",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 16.sp,
+                color = Color(0xFF1A202C)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "${notification.senderName} se ha postulado para tu tarea '${notification.serviceTitle}'.",
-                fontSize = 14.sp
+                fontSize = 14.sp,
+                color = Color(0xFF4A5568),
+                lineHeight = 20.sp
             )
-            // Aquí podrías agregar la fecha y hora de la notificación.
         }
+    }
+}
+
+@Composable
+private fun EmptyNotificationsView() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "No tienes notificaciones por ahora.",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF718096),
+            textAlign = TextAlign.Center
+        )
     }
 }

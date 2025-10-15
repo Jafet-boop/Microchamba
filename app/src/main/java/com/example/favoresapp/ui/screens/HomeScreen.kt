@@ -7,17 +7,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -198,10 +195,11 @@ private fun HeaderSection(
                 }
             }
         ) {
-            IconButton(onClick = onNavigateToNotifications) {
+            IconButton(onClick = onNavigateToNotifications, modifier = Modifier.size(48.dp)) {
                 Icon(
                     Icons.Default.Notifications,
-                    contentDescription = "Notificaciones"
+                    contentDescription = "Notificaciones",
+                    modifier = Modifier.size(30.dp)
                 )
             }
         }
@@ -397,10 +395,9 @@ private fun BottomNavigationBar(
                 .padding(vertical = 16.dp, horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            items.forEachIndexed { index, item ->
+            items.forEach { item ->
                 BottomNavButton(
-                    item = item,
-                    index = index
+                    item = item
                 )
             }
         }
@@ -409,8 +406,7 @@ private fun BottomNavigationBar(
 
 @Composable
 private fun BottomNavButton(
-    item: BottomNavItem,
-    index: Int
+    item: BottomNavItem
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -437,7 +433,7 @@ private fun BottomNavButton(
     ) {
         Box(
             modifier = Modifier
-                .size(50.dp)
+                .size(60.dp)
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
@@ -453,7 +449,7 @@ private fun BottomNavButton(
                 imageVector = item.icon,
                 contentDescription = item.title,
                 tint = item.color,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
 
@@ -461,7 +457,7 @@ private fun BottomNavButton(
 
         Text(
             text = item.title,
-            fontSize = 12.sp,
+            fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
             color = Color(0xFF718096),
             textAlign = TextAlign.Center
