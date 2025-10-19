@@ -1,5 +1,5 @@
 package com.example.favoresapp.ui.Model
-
+import java.util.Date
 
 data class Conversation(
     // Lista de los UIDs de los dos participantes.
@@ -7,7 +7,7 @@ data class Conversation(
 
     // Información del último mensaje para mostrar en la vista previa.
     val lastMessageText: String = "",
-    val lastMessageTimestamp: Long? = null,
+    val lastMessageTimestamp: Date? = null,
     val lastMessageSenderId: String = "",
 
     // Nombres y UIDs de los participantes para fácil acceso.
