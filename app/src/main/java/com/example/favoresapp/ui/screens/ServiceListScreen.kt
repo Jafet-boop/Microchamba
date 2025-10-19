@@ -48,7 +48,9 @@ data class ServiceStatus(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ServiceListScreen(onBack: () -> Unit) {
+fun ServiceListScreen(onBack: () -> Unit,
+                      onPublisherClick: (publisherId: String) -> Unit
+) {
     val firestore = FirebaseFirestore.getInstance()
     var services by remember { mutableStateOf<List<Service>>(emptyList()) }
     var listenerRegistration: ListenerRegistration? = null
@@ -202,7 +204,8 @@ fun ServiceListScreen(onBack: () -> Unit) {
                                     ServiceCard(
                                         service = service,
                                         firestore = firestore,
-                                        statusOptions = statusOptions
+                                        statusOptions = statusOptions,
+                                        onPublisherClick = { onPublisherClick(service.userId) }
                                     )
                                 }
                             }
@@ -452,7 +455,8 @@ private fun EmptyStateSection(selectedStatus: ServiceStatus) {
 fun ServiceCard(
     service: Service,
     firestore: FirebaseFirestore,
-    statusOptions: List<ServiceStatus>
+    statusOptions: List<ServiceStatus>,
+    onPublisherClick: () -> Unit
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
@@ -551,10 +555,14 @@ fun ServiceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            //Sección de perfil del usuario que publicó
+
             userProfile?.let { profile ->
+
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp)) // 1. Recorta la forma para que el efecto "ripple" sea redondeado
+                        .clickable(onClick = onPublisherClick), // 2. ¡Aquí se añade la acción de clic!
                     colors = CardDefaults.cardColors(
                         containerColor = Color(0xFFF8FAFC)
                     ),
@@ -566,7 +574,7 @@ fun ServiceCard(
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Avatar del usuario con inicial
+
                         Box(
                             modifier = Modifier
                                 .size(40.dp)
@@ -590,6 +598,7 @@ fun ServiceCard(
                         }
 
                         Spacer(modifier = Modifier.width(12.dp))
+
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -626,9 +635,10 @@ fun ServiceCard(
                             }
                         }
 
+                        // 3. Ícono actualizado para indicar que se puede chatear
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
+                            imageVector = Icons.Default.Message,
+                            contentDescription = "Iniciar chat",
                             tint = Color(0xFF667eea),
                             modifier = Modifier.size(20.dp)
                         )
@@ -637,6 +647,7 @@ fun ServiceCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
+
 
             // Description
             Text(

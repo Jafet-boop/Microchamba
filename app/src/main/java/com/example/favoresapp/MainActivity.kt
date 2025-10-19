@@ -26,6 +26,8 @@ import com.example.favoresapp.ui.screens.EditProfileScreen
 import com.example.favoresapp.ui.screens.ProfileScreen
 import com.example.favoresapp.ui.screens.PublishServiceScreen
 import com.example.favoresapp.ui.screens.ServiceListScreen
+import com.example.favoresapp.ui.screens.chat.ChatScreen
+import com.example.favoresapp.ui.screens.conversations.ConversationsScreen
 import com.google.firebase.FirebaseApp
 
 
@@ -83,20 +85,40 @@ fun YourAppContent() {
                 HomeScreen(
                     onNavigateToPublish = { navController.navigate("publishService") },
                     onNavigateToFavorList = { navController.navigate("serviceList") },
-                    onNavigateToChat = { /* navegar al Chat */ },
+                    onNavigateToChat = { navController.navigate("conversations_screen") },
                     onNavigateToProfile = { navController.navigate("profile") }
                 )
             }
+
+            composable("conversations_screen") {
+                ConversationsScreen(
+                    onConversationClick = { receiverId ->
+                        navController.navigate("chat_screen/$receiverId")
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(route = "chat_screen/{receiverId}") { backStackEntry ->
+                val receiverId = backStackEntry.arguments?.getString("receiverId")
+                if (receiverId != null) {
+                    ChatScreen(
+                        receiverId = receiverId,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+            }
+
             composable("profile") {
                 ProfileScreen(
-                    navController = navController, // 🔹 PASARLO AQUÍ
+                    navController = navController,
                     onBack = { navController.popBackStack() }
                 )
             }
             composable("editProfile") {
                 EditProfileScreen(
                     onBack = { navController.popBackStack() },
-                    onSaveSuccess = { navController.popBackStack() } // regresa al perfil
+                    onSaveSuccess = { navController.popBackStack() }
                 )
             }
             composable("publishService") {
@@ -107,7 +129,13 @@ fun YourAppContent() {
             }
             composable("serviceList") {
                 ServiceListScreen (
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+
+                    onPublisherClick = { publisherId ->
+                        if (publisherId.isNotEmpty()) {
+                            navController.navigate("chat_screen/$publisherId")
+                        }
+                    }
                 )
             }
         }

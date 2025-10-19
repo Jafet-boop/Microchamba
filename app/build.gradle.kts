@@ -47,38 +47,40 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
-
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // Firebase (con BOM para manejar versiones)
-    implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
+    // --- SECCIÓN DE FIREBASE CORREGIDA ---
+    // La BoM (Bill of Materials) para manejar versiones
+    implementation(platform("com.google.firebase:firebase-bom:33.0.0")) // Usamos una versión estable y compatible
 
-    // Firebase básicos
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-database")
-    implementation("com.google.firebase:firebase-messaging")
-    implementation("com.google.firebase:firebase-firestore")
+    // Dependencias de Firebase con las extensiones KTX necesarias
+    implementation("com.google.firebase:firebase-common-ktx")       // <-- Clave para que funcione 'Firebase.ktx'
+    implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")          // <-- Clave para que funcione '.auth'
+    implementation("com.google.firebase:firebase-database-ktx")
+    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    // --- FIN DE LA SECCIÓN CORREGIDA ---
 
     // Google Sign-In
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     // Google Maps
-    implementation("com.google.android.gms:play-services-maps:19.2.0")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     // Navegation
-    implementation("androidx.navigation:navigation-compose:2.9.4")
+    implementation("androidx.navigation:navigation-compose:2.7.7") // Versiones actualizadas
 
     //Barra de estado
-    implementation("com.google.accompanist:accompanist-systemuicontroller:0.31.5-beta")
+    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
 
     // Coil para Jetpack Compose
-    implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("androidx.compose.material:material-icons-extended") // No se especifica versión aquí cuando se usa BoM
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
