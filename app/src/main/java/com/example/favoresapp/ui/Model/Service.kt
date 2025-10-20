@@ -7,8 +7,9 @@ data class Service(
     val price: String = "",
     val location: String = "",
     val userId: String = "",
-    val status: String = "pendiente",
+    val status: String = "pendiente", // "pendiente", "en progreso", "pendiente_confirmacion", "completado"
     val acceptedBy: String? = null,
     val applicants: List<String> = emptyList(),
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null // 🆕 Timestamp cuando se marcó como completado por el trabajador
 )

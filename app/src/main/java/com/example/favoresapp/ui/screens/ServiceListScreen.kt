@@ -66,19 +66,25 @@ fun ServiceListScreen(onBack: () -> Unit) {
     val statusOptions = remember {
         listOf(
             ServiceStatus(
-                "Pendiente",
+                "Pendiente", // 👈 Este está bien
                 Color(0xFF667eea),
                 Icons.Default.Schedule,
                 listOf(Color(0xFF667eea), Color(0xFF764ba2))
             ),
             ServiceStatus(
-                "En Progreso",
+                "En Curso", // 👈 Más corto
                 Color(0xFF36d1dc),
                 Icons.Default.Work,
                 listOf(Color(0xFF36d1dc), Color(0xFF5b86e5))
             ),
             ServiceStatus(
-                "Completado",
+                "Confirmar", // 👈 Más corto
+                Color(0xFFFF9800),
+                Icons.Default.HourglassEmpty,
+                listOf(Color(0xFFFF9800), Color(0xFFFF6F00))
+            ),
+            ServiceStatus(
+                "Completo", // 👈 Más corto
                 Color(0xFF34A853),
                 Icons.Default.CheckCircle,
                 listOf(Color(0xFF34A853), Color(0xFF4CAF50))
@@ -133,7 +139,8 @@ fun ServiceListScreen(onBack: () -> Unit) {
         filtered = when (selectedTab) {
             0 -> filtered.filter { it.status == "pendiente" }
             1 -> filtered.filter { it.status == "en progreso" }
-            2 -> filtered.filter { it.status == "completado" }
+            2 -> filtered.filter { it.status == "pendiente_confirmacion" }
+            3 -> filtered.filter { it.status == "completado" }
             else -> filtered
         }
 
@@ -214,7 +221,11 @@ fun ServiceListScreen(onBack: () -> Unit) {
                             label = { Text("Buscar...") },
                             modifier = Modifier.weight(1f),
                             leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = "Buscar")
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Buscar",
+                                    tint = Color.Black
+                                )
                             },
                             shape = RoundedCornerShape(12.dp)
                         )
@@ -225,7 +236,11 @@ fun ServiceListScreen(onBack: () -> Unit) {
                                 onClick = { expanded = true },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Default.FilterList, contentDescription = "Categoría")
+                                Icon(
+                                    Icons.Default.FilterList,
+                                    contentDescription = "Categoría",
+                                    tint = Color.Black
+                                )
                             }
                             DropdownMenu(
                                 expanded = expanded,
@@ -761,7 +776,8 @@ private fun CustomTabSection(
                 val serviceCount = when (index) {
                     0 -> allServices.count { it.status == "pendiente" }
                     1 -> allServices.count { it.status == "en progreso" }
-                    2 -> allServices.count { it.status == "completado" }
+                    2 -> allServices.count { it.status == "pendiente_confirmacion" }
+                    3 -> allServices.count { it.status == "completado" }
                     else -> 0
                 }
 
@@ -806,12 +822,12 @@ private fun CustomTabSection(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = status.name,
-                                fontSize = 11.sp, // 🆕 Texto más pequeño
+                                fontSize = 10.sp, // 🆕 Texto más pequeño
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 color = if (isSelected) Color.White else Color(0xFF718096),
                                 maxLines = 2, // 🆕 Permite 2 líneas
                                 overflow = TextOverflow.Ellipsis,
-                                lineHeight = 12.sp // 🆕 Altura de línea ajustada
+                                lineHeight = 10.sp // 🆕 Altura de línea ajustada
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -899,6 +915,8 @@ fun ServiceCard(
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
+    var showCompleteDialog by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(service.userId) {
         if (service.userId.isNotEmpty()) {
@@ -919,8 +937,152 @@ fun ServiceCard(
     val statusData = when (service.status) {
         "pendiente" -> statusOptions[0]
         "en progreso" -> statusOptions[1]
-        "completado" -> statusOptions[2]
+        "pendiente_confirmacion" -> statusOptions[2]
+        "completado" -> statusOptions[3]
         else -> statusOptions[0]
+    }
+
+    // 🆕 Diálogo para marcar como completado
+    if (showCompleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showCompleteDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFFFF9800),
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    "¿Trabajo Terminado?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("El dueño del servicio recibirá una notificación para confirmar que el trabajo se completó correctamente.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (serviceId.isNotEmpty()) {
+                            firestore.collection("services")
+                                .document(serviceId)
+                                .update(
+                                    mapOf(
+                                        "status" to "pendiente_confirmacion",
+                                        "completedBy" to currentUser?.uid
+                                    )
+                                )
+                                .addOnSuccessListener {
+                                    Log.d("ServiceCard", "Marcado como pendiente de confirmación")
+
+                                    // Crear notificación al dueño
+                                    firestore.collection("users").document(currentUser?.uid ?: "").get()
+                                        .addOnSuccessListener { userDoc ->
+                                            val workerName = userDoc.getString("fullName") ?: "El trabajador"
+
+                                            val notification = Notification(
+                                                recipientId = service.userId,
+                                                senderId = currentUser?.uid ?: "",
+                                                senderName = workerName,
+                                                serviceId = serviceId,
+                                                serviceTitle = service.title,
+                                                type = "work_completed"
+                                            )
+                                            firestore.collection("notifications").add(notification)
+                                        }
+
+                                    showCompleteDialog = false
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("ServiceCard", "Error al marcar como pendiente", e)
+                                }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF9800)
+                    )
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCompleteDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF718096))
+                }
+            }
+        )
+    }
+
+// 🆕 Diálogo para confirmar trabajo completado
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF34A853),
+                    modifier = Modifier.size(48.dp)
+                )
+            },
+            title = {
+                Text(
+                    "Confirmar Trabajo",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("¿Confirmas que el trabajo se completó satisfactoriamente?")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (serviceId.isNotEmpty()) {
+                            firestore.collection("services")
+                                .document(serviceId)
+                                .update("status", "completado")
+                                .addOnSuccessListener {
+                                    Log.d("ServiceCard", "Trabajo confirmado como completado")
+
+                                    // Notificar al trabajador
+                                    firestore.collection("users").document(service.userId).get()
+                                        .addOnSuccessListener { userDoc ->
+                                            val ownerName = userDoc.getString("fullName") ?: "El dueño"
+
+                                            val notification = Notification(
+                                                recipientId = service.acceptedBy ?: "",
+                                                senderId = currentUser?.uid ?: "",
+                                                senderName = ownerName,
+                                                serviceId = serviceId,
+                                                serviceTitle = service.title,
+                                                type = "work_confirmed"
+                                            )
+                                            firestore.collection("notifications").add(notification)
+                                        }
+
+                                    showConfirmDialog = false
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("ServiceCard", "Error al confirmar trabajo", e)
+                                }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF34A853)
+                    )
+                ) {
+                    Text("Sí, Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF718096))
+                }
+            }
+        )
     }
 
     Card(
@@ -980,7 +1142,10 @@ fun ServiceCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = service.status.replaceFirstChar { it.uppercase() },
+                                text = when(service.status) {
+                                    "pendiente_confirmacion" -> "Por Confirmar"
+                                    else -> service.status.replaceFirstChar { it.uppercase() }
+                                },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -1272,15 +1437,10 @@ fun ServiceCard(
                     }
                 }
                 "en progreso" -> {
+                    // 🆕 El trabajador puede marcar como "pendiente de confirmación"
                     if (service.acceptedBy == currentUser?.uid) {
                         Button(
-                            onClick = {
-                                if (serviceId.isNotEmpty()) {
-                                    firestore.collection("services")
-                                        .document(serviceId)
-                                        .update("status", "completado")
-                                }
-                            },
+                            onClick = { showCompleteDialog = true },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent
                             ),
@@ -1290,8 +1450,8 @@ fun ServiceCard(
                                 .background(
                                     brush = Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color(0xFF34A853),
-                                            Color(0xFF4CAF50)
+                                            Color(0xFFFF9800),
+                                            Color(0xFFFF6F00)
                                         )
                                     ),
                                     shape = RoundedCornerShape(12.dp)
@@ -1304,14 +1464,14 @@ fun ServiceCard(
                                 horizontalArrangement = Arrangement.Center
                             ) {
                                 Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = "Completar",
+                                    Icons.Default.HourglassEmpty,
+                                    contentDescription = "Marcar Completado",
                                     tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    "Marcar como Completado",
+                                    "He Terminado el Trabajo",
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
@@ -1347,6 +1507,80 @@ fun ServiceCard(
                                     },
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF36d1dc),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                // 🆕 NUEVO ESTADO: Pendiente de confirmación
+                "pendiente_confirmacion" -> {
+                    if (currentUser?.uid == service.userId) {
+                        // El dueño puede confirmar el trabajo
+                        Button(
+                            onClick = { showConfirmDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFF34A853),
+                                            Color(0xFF4CAF50)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clip(RoundedCornerShape(12.dp))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Confirmar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Confirmar Trabajo Completado",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFFFF9800).copy(alpha = 0.1f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.HourglassEmpty,
+                                    contentDescription = "Esperando confirmación",
+                                    tint = Color(0xFFFF9800),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Esperando confirmación del dueño",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF9800),
                                     fontSize = 13.sp
                                 )
                             }
