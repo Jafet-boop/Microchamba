@@ -53,19 +53,17 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // --- SECCIÓN DE FIREBASE CORREGIDA ---
-    // La BoM (Bill of Materials) para manejar versiones
-    implementation(platform("com.google.firebase:firebase-bom:33.0.0")) // Usamos una versión estable y compatible
+
+    implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
 
     // Dependencias de Firebase con las extensiones KTX necesarias
-    implementation("com.google.firebase:firebase-common-ktx")       // <-- Clave para que funcione 'Firebase.ktx'
+    implementation("com.google.firebase:firebase-common-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
-    implementation("com.google.firebase:firebase-auth-ktx")          // <-- Clave para que funcione '.auth'
+    implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-database-ktx")
-    // --- FIN DE LA SECCIÓN CORREGIDA ---
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.2.0")

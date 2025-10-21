@@ -35,21 +35,16 @@ class ChatViewModelFactory(private val receiverId: String) : ViewModelProvider.F
 
 class ChatViewModel(private val receiverId: String) : ViewModel() {
 
+    // ... tus variables (db, auth, rtdb, etc.) no cambian ...
     private val db = Firebase.firestore
     private val auth = Firebase.auth
     private val rtdb = Firebase.database.reference
-
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
     val messages = _messages.asStateFlow()
-
     private val _receiverProfile = MutableStateFlow<User?>(null)
-    // --- CORRECCIÓN DEL TYPO AQUÍ ---
-    // Era _receiver_profile, ahora es _receiverProfile (con P mayúscula)
     val receiverProfile = _receiverProfile.asStateFlow()
-
     private val _isReceiverTyping = MutableStateFlow(false)
     val isReceiverTyping = _isReceiverTyping.asStateFlow()
-
     private var chatId: String? = null
     private var typingStatusRef: com.google.firebase.database.DatabaseReference? = null
     private var receiverTypingListener: ValueEventListener? = null
@@ -58,7 +53,22 @@ class ChatViewModel(private val receiverId: String) : ViewModel() {
     init {
         obtenerChatId()
         fetchReceiverProfile()
+        markConversationAsRead()
     }
+
+    // --- 2. NUEVA FUNCIÓN PARA MARCAR EL CHAT COMO LEÍDO ---
+    private fun markConversationAsRead() {
+        val currentUserId = auth.currentUser?.uid
+        if (currentUserId != null && chatId != null) {
+            db.collection("chats").document(chatId!!)
+                .update(
+                    "lastMessageReadBy", FieldValue.arrayUnion(currentUserId)
+                )
+                .addOnSuccessListener { Log.d("ChatViewModel", "Chat marcado como leído.") }
+                .addOnFailureListener { e -> Log.w("ChatViewModel", "Error al marcar como leído", e) }
+        }
+    }
+
 
     private fun obtenerChatId() {
         val currentUserId = auth.currentUser?.uid
@@ -130,24 +140,18 @@ class ChatViewModel(private val receiverId: String) : ViewModel() {
             Log.e("ChatViewModel_Send", "No se puede enviar el mensaje. Usuario, texto o chatId nulos.")
             return
         }
+        val receiverName = receiverProfile.value?.fullName
+        if (receiverName == null) {
+            Log.e("ChatViewModel_Send", "¡FALLO! El perfil del receptor aún no se ha cargado.")
+            return
+        }
 
-        // El objeto Message no cambia
         val message = Message(
             texto = texto,
             usuarioId = currentUser.uid,
             nombreUsuario = currentUser.displayName ?: "Anónimo"
         )
-
         val chatDocRef = db.collection("chats").document(chatId!!)
-
-        // Obtenemos el nombre del receptor de forma segura
-        val receiverName = receiverProfile.value?.fullName
-
-        if (receiverName == null) {
-            Log.e("ChatViewModel_Send", "¡FALLO! El perfil del receptor aún no se ha cargado. Intenta de nuevo.")
-            // Opcional: Podrías mostrar un Toast al usuario aquí.
-            return // Detenemos la ejecución para evitar el crash.
-        }
 
         Log.d("ChatViewModel_Send", "Intentando guardar mensaje en lote...")
         db.runBatch { batch ->
@@ -160,18 +164,14 @@ class ChatViewModel(private val receiverId: String) : ViewModel() {
                 "lastMessageSenderId" to currentUser.uid,
                 "participantNames" to mapOf(
                     currentUser.uid to (currentUser.displayName ?: "Anónimo"),
-                    receiverId to receiverName // Usamos el nombre que ya verificamos
-                )
+                    receiverId to receiverName
+                ),
+                "lastMessageReadBy" to listOf(currentUser.uid)
             )
             batch.set(chatDocRef, conversationData, SetOptions.merge())
         }
-            .addOnSuccessListener {
-                Log.d("ChatViewModel_Send", "¡ÉXITO! Mensaje guardado correctamente.")
-            }
-            .addOnFailureListener { e ->
-                // Si algo falla, esto nos dirá exactamente por qué.
-                Log.e("ChatViewModel_Send", "¡FALLO! El lote de escritura no se pudo completar.", e)
-            }
+            .addOnSuccessListener { Log.d("ChatViewModel_Send", "¡ÉXITO! Mensaje guardado.") }
+            .addOnFailureListener { e -> Log.e("ChatViewModel_Send", "¡FALLO! El lote no se pudo completar.", e) }
     }
 
     override fun onCleared() {

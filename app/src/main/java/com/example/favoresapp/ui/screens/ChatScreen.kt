@@ -85,9 +85,6 @@ fun ChatScreen(
                 onBack = onBack
             )
 
-            // --- INICIO DE LA ESTRUCTURA ALTERNATIVA Y SEGURA ---
-
-            // 1. La lista de mensajes ocupa el espacio restante.
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
@@ -99,11 +96,8 @@ fun ChatScreen(
                 }
             }
 
-            // 2. El indicador "Escribiendo..." es un elemento normal en la Column.
-            //    No necesita .align() y por lo tanto, no dará error.
             AnimatedVisibility(
                 visible = isReceiverTyping,
-                // Le damos un padding para que se vea bien
                 modifier = Modifier.padding(start = 18.dp, bottom = 4.dp, top = 4.dp)
             ) {
                 Text(
@@ -113,8 +107,6 @@ fun ChatScreen(
                 )
             }
 
-            // --- FIN DE LA ESTRUCTURA ALTERNATIVA ---
-
             ChatInputBar(
                 text = textState,
                 onTextChange = { newText ->
@@ -122,8 +114,9 @@ fun ChatScreen(
                     chatViewModel.updateUserTypingStatus(newText.isNotEmpty())
                 },
                 onSendClick = {
-                    if (textState.isNotBlank()) {
-                        chatViewModel.enviarMensaje(textState)
+                    val trimmedText = textState.trim()
+                    if (trimmedText.isNotBlank()) {
+                        chatViewModel.enviarMensaje(trimmedText)
                         textState = ""
                         chatViewModel.updateUserTypingStatus(false)
                     }

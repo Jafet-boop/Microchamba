@@ -1,5 +1,6 @@
 package com.example.favoresapp.ui.screens.conversations
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -102,16 +103,26 @@ private fun ConversationsTopBar(onBack: () -> Unit) {
 @Composable
 private fun ConversationCard(conversation: Conversation, onClick: (receiverId: String) -> Unit) {
     val currentUserId = Firebase.auth.currentUser?.uid
-    // Encuentra el ID y el nombre de la OTRA persona en el chat.
+
+
     val otherUserId = conversation.participants.firstOrNull { it != currentUserId } ?: ""
     val otherUserName = conversation.participantNames[otherUserId] ?: "Usuario"
+    val isLastMessageMine = conversation.lastMessageSenderId == currentUserId
+    val isUnread = !isLastMessageMine && !conversation.lastMessageReadBy.contains(currentUserId)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick(otherUserId) }, // Hace que toda la tarjeta sea clicable
+            .clickable {
+                Log.d("ConversationsClick", "ID del otro usuario: '$otherUserId'")
+                if (otherUserId.isNotEmpty()) {
+                    onClick(otherUserId)
+                } else {
+                    Log.e("ConversationsClick", "Error: El ID del receptor está vacío.")
+                }
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
@@ -121,7 +132,7 @@ private fun ConversationCard(conversation: Conversation, onClick: (receiverId: S
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
+
             Box(
                 modifier = Modifier
                     .size(50.dp)
@@ -153,10 +164,12 @@ private fun ConversationCard(conversation: Conversation, onClick: (receiverId: S
                     color = Color(0xFF1A202C)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
                     text = conversation.lastMessageText,
                     fontSize = 14.sp,
-                    color = Color(0xFF718096),
+                    fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isUnread) Color(0xFF1A202C) else Color(0xFF718096),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

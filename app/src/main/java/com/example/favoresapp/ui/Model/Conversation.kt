@@ -7,9 +7,9 @@ data class Conversation(
 
     // Información del último mensaje para mostrar en la vista previa.
     val lastMessageText: String = "",
+
     val lastMessageTimestamp: Date? = null,
     val lastMessageSenderId: String = "",
-
-    // Nombres y UIDs de los participantes para fácil acceso.
-    val participantNames: Map<String, String> = emptyMap()
+    val participantNames: Map<String, String> = emptyMap(),
+    val lastMessageReadBy: List<String> = emptyList()
 )
