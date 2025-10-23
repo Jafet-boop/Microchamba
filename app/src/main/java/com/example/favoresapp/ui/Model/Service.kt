@@ -9,6 +9,7 @@ data class Service(
     val userId: String = "",
     val publisherName: String = "",
     val status: String = "pendiente",      // pendiente, en progreso, completado
-    val acceptedBy: String? = null,        // UID del usuario que aceptó
-    val timestamp: Long = System.currentTimeMillis() // opcional, para ordenar
+    val acceptedBy: String? = null,
+    val timestamp: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null // 🆕 Timestamp cuando se marcó como completado por el trabajador
 )

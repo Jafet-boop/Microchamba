@@ -485,7 +485,12 @@ private fun ActionButtons(navController: NavController) {
                     )
                 )
             ),
-            onClick = { /* cerrar sesión */ }
+            onClick = {
+                FirebaseAuth.getInstance().signOut()
+                navController.navigate("loginScreen") {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
         ) {
             Box(
                 modifier = Modifier

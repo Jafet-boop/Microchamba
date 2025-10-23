@@ -20,9 +20,11 @@ import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import androidx.compose.runtime.SideEffect
 import androidx.navigation.compose.*
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType // Importé NavType que faltaba para la ruta de chat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.favoresapp.ui.screens.EditProfileScreen
+import com.example.favoresapp.ui.screens.NotificationsScreen
 import com.example.favoresapp.ui.screens.ProfileScreen
 import com.example.favoresapp.ui.screens.PublishServiceScreen
 import com.example.favoresapp.ui.screens.ServiceListScreen
@@ -99,7 +101,11 @@ fun YourAppContent() {
                 )
             }
 
-            composable(route = "chat_screen/{receiverId}") { backStackEntry ->
+            composable(
+                route = "chat_screen/{receiverId}",
+                // Añadí el 'arguments' que es necesario para que esta ruta funcione
+                arguments = listOf(navArgument("receiverId") { type = NavType.StringType })
+            ) { backStackEntry ->
                 val receiverId = backStackEntry.arguments?.getString("receiverId")
                 if (receiverId != null) {
                     ChatScreen(
@@ -111,14 +117,14 @@ fun YourAppContent() {
 
             composable("profile") {
                 ProfileScreen(
-                    navController = navController,
+                    navController = navController, // 🔹 PASARLO AQUÍ
                     onBack = { navController.popBackStack() }
                 )
             }
             composable("editProfile") {
                 EditProfileScreen(
                     onBack = { navController.popBackStack() },
-                    onSaveSuccess = { navController.popBackStack() }
+                    onSaveSuccess = { navController.popBackStack() } // regresa al perfil
                 )
             }
             composable("publishService") {
@@ -127,6 +133,7 @@ fun YourAppContent() {
                     onSaveSuccess = { navController.popBackStack() }
                 )
             }
+
             composable("serviceList") {
                 ServiceListScreen (
                     onBack = { navController.popBackStack() },
@@ -136,6 +143,12 @@ fun YourAppContent() {
                             navController.navigate("chat_screen/$publisherId")
                         }
                     }
+                )
+            }
+
+            composable("notifications") {
+                NotificationsScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
         }
