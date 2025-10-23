@@ -19,8 +19,8 @@ import androidx.compose.foundation.layout.systemBars
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import androidx.compose.runtime.SideEffect
 import androidx.navigation.compose.*
-import androidx.navigation.NavHostController
-import androidx.navigation.NavType // Importé NavType que faltaba para la ruta de chat
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.favoresapp.ui.screens.EditProfileScreen

@@ -332,7 +332,8 @@ fun ServiceListScreen(onBack: () -> Unit,
                                             } else {
                                                 Log.e("ServiceList", "No se encontró el ID del servicio")
                                             }
-                                        }
+                                        },
+                                        onPublisherClick = { onPublisherClick(service.userId) }
                                     )
                                 }
                             }
@@ -918,7 +919,8 @@ fun ServiceCard(
     serviceId: String,
     firestore: FirebaseFirestore,
     statusOptions: List<ServiceStatus>,
-    onViewApplicants: (Service) -> Unit = {}
+    onViewApplicants: (Service) -> Unit = {},
+    onPublisherClick: () -> Unit
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
@@ -949,7 +951,7 @@ fun ServiceCard(
         else -> statusOptions[0]
     }
 
-    // 🆕 Diálogo para marcar como completado
+    // --- Diálogos (sin cambios) ---
     if (showCompleteDialog) {
         AlertDialog(
             onDismissRequest = { showCompleteDialog = false },
@@ -1023,7 +1025,6 @@ fun ServiceCard(
         )
     }
 
-// 🆕 Diálogo para confirmar trabajo completado
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
@@ -1091,6 +1092,8 @@ fun ServiceCard(
             }
         )
     }
+    // --- Fin Diálogos ---
+
 
     Card(
         modifier = Modifier
@@ -1107,6 +1110,7 @@ fun ServiceCard(
         Column(
             modifier = Modifier.padding(20.dp)
         ) {
+            // --- Header (Sin cambios) ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1149,6 +1153,7 @@ fun ServiceCard(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
+                                // Tu lógica para cambiar el texto del status
                                 text = when(service.status) {
                                     "pendiente_confirmacion" -> "Por Confirmar"
                                     else -> service.status.replaceFirstChar { it.uppercase() }
@@ -1161,16 +1166,17 @@ fun ServiceCard(
                     }
                 }
             }
+            // --- Fin Header ---
 
             Spacer(modifier = Modifier.height(12.dp))
 
-
+            // --- Tarjeta de Perfil Clickeable (Sin cambios) ---
             userProfile?.let { profile ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp)) // 1. Recorta la forma para que el efecto "ripple" sea redondeado
-                        .clickable(onClick = onPublisherClick), // 2. ¡Aquí se añade la acción de clic!
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(onClick = onPublisherClick), // <-- Tu funcionalidad de clic
                     colors = CardDefaults.cardColors(
                         containerColor = Color(0xFFF8FAFC)
                     ),
@@ -1243,8 +1249,8 @@ fun ServiceCard(
                         }
 
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
+                            imageVector = Icons.Default.Message, // <-- Tu ícono
+                            contentDescription = "Ver Perfil",
                             tint = Color(0xFF667eea),
                             modifier = Modifier.size(20.dp)
                         )
@@ -1253,9 +1259,10 @@ fun ServiceCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
             }
+            // --- Fin Tarjeta de Perfil ---
 
 
-            // Description
+            // --- Detalles (Sin cambios) ---
             Text(
                 text = service.description,
                 fontSize = 14.sp,
@@ -1293,11 +1300,14 @@ fun ServiceCard(
                     color = Color(0xFF4285F4)
                 )
             }
+            // --- Fin Detalles ---
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // --- Lógica de Botones (Aquí estaba el corte) ---
             when (service.status) {
                 "pendiente" -> {
+                    // Lógica para "pendiente" (sin cambios)
                     if (currentUser?.uid == service.userId) {
                         val applicantCount = service.applicants.size
 
@@ -1451,7 +1461,7 @@ fun ServiceCard(
                     }
                 }
                 "en progreso" -> {
-                    // 🆕 El trabajador puede marcar como "pendiente de confirmación"
+                    // Lógica para "en progreso" (sin cambios)
                     if (service.acceptedBy == currentUser?.uid) {
                         Button(
                             onClick = { showCompleteDialog = true },
@@ -1527,10 +1537,10 @@ fun ServiceCard(
                         }
                     }
                 }
-                // 🆕 NUEVO ESTADO: Pendiente de confirmación
+
                 "pendiente_confirmacion" -> {
                     if (currentUser?.uid == service.userId) {
-                        // El dueño puede confirmar el trabajo
+                        // Lógica para "pendiente_confirmacion" (sin cambios)
                         Button(
                             onClick = { showConfirmDialog = true },
                             colors = ButtonDefaults.buttonColors(
