@@ -40,7 +40,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.filled.Person
-
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.favoresapp.ui.Model.Rating
+import com.example.favoresapp.ui.ViewModels.UserStatsViewModel
+import com.example.favoresapp.ui.components.RatingDialog
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 data class ServiceStatus(
     val name: String,
@@ -920,12 +925,17 @@ fun ServiceCard(
     firestore: FirebaseFirestore,
     statusOptions: List<ServiceStatus>,
     onViewApplicants: (Service) -> Unit = {},
-    onPublisherClick: () -> Unit
+    onPublisherClick: () -> Unit,
+    statsViewModel: UserStatsViewModel = viewModel()
 ) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     var userProfile by remember { mutableStateOf<User?>(null) }
+    var workerProfile by remember { mutableStateOf<User?>(null) }
     var showCompleteDialog by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var isRated by remember { mutableStateOf(service.isRated ?: false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(service.userId) {
         if (service.userId.isNotEmpty()) {
@@ -939,6 +949,21 @@ fun ServiceCard(
                 }
                 .addOnFailureListener { e ->
                     Log.e("ServiceCard", "Error cargando perfil", e)
+                }
+        }
+    }
+    LaunchedEffect(service.acceptedBy) {
+        if (!service.acceptedBy.isNullOrEmpty()) {
+            firestore.collection("users")
+                .document(service.acceptedBy)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        workerProfile = document.toObject(User::class.java)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("ServiceCard", "Error cargando perfil del trabajador", e)
                 }
         }
     }
@@ -1094,6 +1119,94 @@ fun ServiceCard(
     }
     // --- Fin Diálogos ---
 
+    if (showRatingDialog) {
+        RatingDialog(
+            onDismiss = { showRatingDialog = false },
+            onSubmit = { rating, comment ->
+                scope.launch {
+                    try {
+                        val ratingObj = Rating(
+                            favorId = serviceId,
+                            fromUserId = currentUser?.uid ?: "",
+                            toUserId = service.acceptedBy ?: "",
+                            rating = rating,
+                            comment = comment
+                        )
+
+                        // 1. Guardar calificación en la colección ratings
+                        firestore.collection("ratings")
+                            .document(ratingObj.id)
+                            .set(ratingObj)
+                            .await()
+
+                        // 2. Actualizar el servicio marcándolo como calificado
+                        firestore.collection("services")
+                            .document(serviceId)
+                            .update("isRated", true)
+                            .await()
+
+                        // 3. Actualizar estadísticas del usuario
+                        val ratingsSnapshot = firestore.collection("ratings")
+                            .whereEqualTo("toUserId", service.acceptedBy ?: "")
+                            .get()
+                            .await()
+
+                        val ratings = ratingsSnapshot.documents.mapNotNull {
+                            it.toObject(Rating::class.java)
+                        }
+
+                        val totalRatings = ratings.size
+                        val averageRating = if (totalRatings > 0) {
+                            ratings.map { it.rating }.average().toFloat()
+                        } else 0f
+
+                        val uniqueFavors = ratings.map { it.favorId }.distinct().size
+                        val uniqueHelped = ratings.map { it.fromUserId }.distinct().size
+
+                        val updatedStats = mapOf(
+                            "userId" to (service.acceptedBy ?: ""),
+                            "favorsCompleted" to uniqueFavors,
+                            "averageRating" to averageRating,
+                            "totalRatings" to totalRatings,
+                            "peopleHelped" to uniqueHelped,
+                            "lastUpdated" to System.currentTimeMillis()
+                        )
+
+                        firestore.collection("userStats")
+                            .document(service.acceptedBy ?: "")
+                            .set(updatedStats)
+                            .await()
+
+                        // 4. Actualizar estado local
+                        isRated = true
+                        showRatingDialog = false
+
+                        // 5. Crear notificación al trabajador
+                        firestore.collection("users").document(currentUser?.uid ?: "").get()
+                            .addOnSuccessListener { userDoc ->
+                                val ownerName = userDoc.getString("fullName") ?: "El dueño"
+
+                                val notification = Notification(
+                                    recipientId = service.acceptedBy ?: "",
+                                    senderId = currentUser?.uid ?: "",
+                                    senderName = ownerName,
+                                    serviceId = serviceId,
+                                    serviceTitle = service.title,
+                                    type = "rating_received"
+                                )
+                                firestore.collection("notifications").add(notification)
+                            }
+
+                        Log.d("ServiceCard", "Calificación guardada exitosamente")
+
+                    } catch (e: Exception) {
+                        Log.e("ServiceCard", "Error al calificar: ${e.message}", e)
+                    }
+                }
+            },
+            userName = workerProfile?.fullName ?: "el trabajador"
+        )
+    }
 
     Card(
         modifier = Modifier
@@ -1612,32 +1725,75 @@ fun ServiceCard(
                     }
                 }
                 "completado" -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF34A853).copy(alpha = 0.1f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(
+                    // Si el usuario actual es el dueño y aún no ha calificado
+                    if (currentUser?.uid == service.userId && !isRated) {
+                        Button(
+                            onClick = { showRatingDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                                .background(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFFD69E2E),
+                                            Color(0xFFF59E0B)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clip(RoundedCornerShape(12.dp))
                         ) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = "Completado",
-                                tint = Color(0xFF34A853),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Trabajo Completado",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF34A853)
-                            )
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = "Calificar",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Calificar Servicio",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        // Si ya fue calificado o es el trabajador
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color(0xFF34A853).copy(alpha = 0.1f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = "Completado",
+                                    tint = Color(0xFF34A853),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isRated) "Trabajo Calificado" else "Trabajo Completado",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF34A853)
+                                )
+                            }
                         }
                     }
                 }

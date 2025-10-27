@@ -17,7 +17,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +32,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-// --- Funciones auxiliares (sin cambios) ---
+// --- Funciones auxiliares ---
 private fun formatDateSeparator(date: Date): String {
     val calendar = Calendar.getInstance()
     calendar.time = date
@@ -69,33 +68,51 @@ fun ChatScreen(
         messages.groupBy { message ->
             val calendar = Calendar.getInstance()
             calendar.time = message.timestamp ?: Date(0)
-            calendar.set(Calendar.HOUR_OF_DAY, 0); calendar.set(Calendar.MINUTE, 0); calendar.set(Calendar.SECOND, 0); calendar.set(Calendar.MILLISECOND, 0)
+            calendar.set(Calendar.HOUR_OF_DAY, 0)
+            calendar.set(Calendar.MINUTE, 0)
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
             calendar.time
         }
     }
 
+    // ✅ Box en lugar de Scaffold para mejor control
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(brush = Brush.verticalGradient(colors = listOf(Color(0xFFF8FAFC), Color(0xFFE2E8F0))))
+            .background(Color(0xFFF5F5F5))
     ) {
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding() // ✅ CLAVE: Esto maneja el padding del teclado
+        ) {
+            // Header fijo
             ChatTopBar(
                 contactName = receiverProfile?.fullName ?: "Cargando...",
                 onBack = onBack
             )
 
+            // Lista de mensajes
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 8.dp
+                )
             ) {
                 groupedMessages.forEach { (date, messagesInDay) ->
                     item { DateSeparator(date = formatDateSeparator(date)) }
-                    items(messagesInDay) { message -> MessageBubble(message = message) }
+                    items(messagesInDay) { message ->
+                        MessageBubble(message = message)
+                    }
                 }
             }
 
+            // Indicador de "Escribiendo..."
             AnimatedVisibility(
                 visible = isReceiverTyping,
                 modifier = Modifier.padding(start = 18.dp, bottom = 4.dp, top = 4.dp)
@@ -103,10 +120,12 @@ fun ChatScreen(
                 Text(
                     text = "Escribiendo...",
                     fontSize = 14.sp,
-                    color = Color.Gray
+                    color = Color(0xFF667eea),
+                    fontWeight = FontWeight.Medium
                 )
             }
 
+            // Barra de input
             ChatInputBar(
                 text = textState,
                 onTextChange = { newText ->
@@ -125,7 +144,8 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(messages) {
+    // Auto-scroll cuando llegan mensajes nuevos
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             coroutineScope.launch {
                 val targetIndex = listState.layoutInfo.totalItemsCount - 1
@@ -137,52 +157,58 @@ fun ChatScreen(
     }
 }
 
-// --- El resto de tus Composables (ChatTopBar, MessageBubble, etc.) no cambian ---
-@Composable private fun ChatTopBar(contactName: String, onBack: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)),
-        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+// ✅ HEADER FIJO - Siempre visible
+@Composable
+private fun ChatTopBar(contactName: String, onBack: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF667eea),
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+                .statusBarsPadding() // ✅ Respeta la barra de estado
+                .padding(horizontal = 8.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.background(Color(0xFF667eea).copy(alpha = 0.1f), CircleShape)
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color(0xFF667eea))
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White
+                )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = contactName,
-                fontSize = 24.sp,
+                fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A202C),
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
     }
 }
-@Composable private fun DateSeparator(date: String) {
+
+@Composable
+private fun DateSeparator(date: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Card(
+        Surface(
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFE2E8F0))
+            color = Color(0xFFE2E8F0)
         ) {
             Text(
-                text = date.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+                text = date.replaceFirstChar {
+                    if (it.isLowerCase()) it.titlecase(Locale.getDefault())
+                    else it.toString()
+                },
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF718096),
@@ -191,7 +217,9 @@ fun ChatScreen(
         }
     }
 }
-@Composable private fun MessageBubble(message: Message) {
+
+@Composable
+private fun MessageBubble(message: Message) {
     val currentUserId = Firebase.auth.currentUser?.uid
     val isCurrentUser = message.usuarioId == currentUserId
     val timeFormatter = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
@@ -203,16 +231,16 @@ fun ChatScreen(
             .padding(vertical = 4.dp),
         contentAlignment = if (isCurrentUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
-        Card(
-            modifier = Modifier.widthIn(max = 300.dp),
+        Surface(
+            modifier = Modifier.widthIn(max = 280.dp),
             shape = RoundedCornerShape(
-                topStart = 16.dp, topEnd = 16.dp,
-                bottomStart = if (isCurrentUser) 16.dp else 0.dp,
-                bottomEnd = if (isCurrentUser) 0.dp else 16.dp
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isCurrentUser) 16.dp else 4.dp,
+                bottomEnd = if (isCurrentUser) 4.dp else 16.dp
             ),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isCurrentUser) Color(0xFF667eea) else Color.White
-            )
+            color = if (isCurrentUser) Color(0xFF667eea) else Color.White,
+            shadowElevation = 1.dp
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -227,54 +255,89 @@ fun ChatScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = formattedTime,
-                    fontSize = 12.sp,
-                    color = if (isCurrentUser) Color.White.copy(alpha = 0.7f) else Color.Gray,
+                    fontSize = 11.sp,
+                    color = if (isCurrentUser) Color.White.copy(alpha = 0.8f) else Color(0xFF718096)
                 )
             }
         }
     }
 }
-@Composable private fun ChatInputBar(text: String, onTextChange: (String) -> Unit, onSendClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+
+// ✅ Input bar optimizado
+@Composable
+private fun ChatInputBar(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSendClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shadowElevation = 8.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
+            // TextField con mejor contraste
+            Surface(
                 modifier = Modifier.weight(1f),
-                placeholder = { Text("Escribe un mensaje...") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color.Transparent,
-                    unfocusedBorderColor = Color.Transparent,
-                    cursorColor = Color(0xFF667eea)
-                ),
-                maxLines = 4,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { onSendClick() })
-            )
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xFFF5F5F5)
+            ) {
+                TextField(
+                    value = text,
+                    onValueChange = onTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            "Escribe un mensaje...",
+                            color = Color(0xFF9E9E9E)
+                        )
+                    },
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = Color(0xFF667eea),
+                        focusedTextColor = Color(0xFF1A202C),
+                        unfocusedTextColor = Color(0xFF1A202C)
+                    ),
+                    maxLines = 4,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { onSendClick() })
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Botón de enviar
             IconButton(
                 onClick = onSendClick,
                 enabled = text.isNotBlank(),
                 modifier = Modifier
-                    .padding(start = 8.dp)
+                    .size(48.dp)
                     .background(
-                        brush = Brush.horizontalGradient(
-                            colors = if (text.isNotBlank()) listOf(Color(0xFF667eea), Color(0xFF764ba2))
-                            else listOf(Color.Gray, Color.Gray)
-                        ),
+                        brush = if (text.isNotBlank()) {
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF667eea), Color(0xFF764ba2))
+                            )
+                        } else {
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFFBDBDBD), Color(0xFFBDBDBD))
+                            )
+                        },
                         shape = CircleShape
                     )
             ) {
-                Icon(Icons.Default.Send, contentDescription = "Enviar", tint = Color.White)
+                Icon(
+                    Icons.Default.Send,
+                    contentDescription = "Enviar",
+                    tint = Color.White
+                )
             }
         }
     }

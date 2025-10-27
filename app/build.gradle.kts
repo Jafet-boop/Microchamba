@@ -79,7 +79,8 @@ dependencies {
 
     // Coil para Jetpack Compose
     implementation("io.coil-kt:coil-compose:2.6.0")
-    implementation("androidx.compose.material:material-icons-extended") // No se especifica versión aquí cuando se usa BoM
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation(libs.androidx.core.splashscreen) // No se especifica versión aquí cuando se usa BoM
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

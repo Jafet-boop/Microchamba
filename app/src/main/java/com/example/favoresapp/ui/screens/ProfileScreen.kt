@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,6 +33,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.favoresapp.ui.Model.UserStats
+import com.example.favoresapp.ui.ViewModels.UserStatsViewModel
 import kotlinx.coroutines.delay
 
 data class ProfileInfoItem(
@@ -43,7 +47,11 @@ data class ProfileInfoItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(navController: NavController, onBack: () -> Unit) {
+fun ProfileScreen(
+    navController: NavController,
+    onBack: () -> Unit,
+    statsViewModel: UserStatsViewModel = viewModel() // AGREGAR ESTA LÍNEA
+) {
     val auth = FirebaseAuth.getInstance()
     val currentUser = auth.currentUser
 
@@ -51,6 +59,9 @@ fun ProfileScreen(navController: NavController, onBack: () -> Unit) {
     var user by remember { mutableStateOf(User()) }
     var showContent by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+
+    val userStats by statsViewModel.userStats.collectAsState()
+
 
     // Leer datos de Firestore cuando se carga la pantalla
     LaunchedEffect(currentUser?.uid) {
@@ -156,7 +167,10 @@ fun ProfileScreen(navController: NavController, onBack: () -> Unit) {
                                 initialScale = 0.8f
                             )
                 ) {
-                    ProfileHeader(user = user)
+                    ProfileHeader(
+                        user = user,
+                        userStats = userStats
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -246,7 +260,10 @@ private fun CustomTopBar(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ProfileHeader(user: User) {
+private fun ProfileHeader(
+    user: User,
+    userStats: UserStats // AGREGAR ESTE PARÁMETRO
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -324,7 +341,11 @@ private fun ProfileHeader(user: User) {
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "o.0",
+                    text = if (userStats.totalRatings > 0) {
+                        String.format("%.1f (%d)", userStats.averageRating, userStats.totalRatings)
+                    } else {
+                        "Sin calificaciones"
+                    },
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFF718096)
@@ -344,10 +365,49 @@ private fun ProfileHeader(user: User) {
                     color = Color(0xFF718096)
                 )
             }
+
+            // AGREGAR ESTADÍSTICAS ADICIONALES
+            if (userStats.favorsCompleted > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    // Favores completados
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = userStats.favorsCompleted.toString(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1A202C)
+                        )
+                        Text(
+                            text = "Favores",
+                            fontSize = 12.sp,
+                            color = Color(0xFF718096)
+                        )
+                    }
+
+                    // Personas ayudadas
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = userStats.peopleHelped.toString(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1A202C)
+                        )
+                        Text(
+                            text = "Ayudados",
+                            fontSize = 12.sp,
+                            color = Color(0xFF718096)
+                        )
+                    }
+                }
+            }
         }
     }
 }
-
 @Composable
 private fun ProfileInfoCard(item: ProfileInfoItem) {
     Card(
@@ -487,8 +547,9 @@ private fun ActionButtons(navController: NavController) {
             ),
             onClick = {
                 FirebaseAuth.getInstance().signOut()
-                navController.navigate("loginScreen") {
+                navController.navigate("login") {
                     popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
                 }
             }
         ) {

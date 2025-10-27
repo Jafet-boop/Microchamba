@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class ChatViewModelFactory(private val receiverId: String) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -140,38 +141,49 @@ class ChatViewModel(private val receiverId: String) : ViewModel() {
             Log.e("ChatViewModel_Send", "No se puede enviar el mensaje. Usuario, texto o chatId nulos.")
             return
         }
+
         val receiverName = receiverProfile.value?.fullName
         if (receiverName == null) {
             Log.e("ChatViewModel_Send", "¡FALLO! El perfil del receptor aún no se ha cargado.")
             return
         }
 
-        val message = Message(
-            texto = texto,
-            usuarioId = currentUser.uid,
-            nombreUsuario = currentUser.displayName ?: "Anónimo"
-        )
-        val chatDocRef = db.collection("chats").document(chatId!!)
+        // 🆕 AGREGAR: Cargar el fullName del usuario actual
+        viewModelScope.launch {
+            try {
+                val currentUserDoc = db.collection("users").document(currentUser.uid).get().await()
+                val currentUserFullName = currentUserDoc.toObject(User::class.java)?.fullName ?: "Usuario"
 
-        Log.d("ChatViewModel_Send", "Intentando guardar mensaje en lote...")
-        db.runBatch { batch ->
-            batch.set(chatDocRef.collection("messages").document(), message)
+                val message = Message(
+                    texto = texto,
+                    usuarioId = currentUser.uid,
+                    nombreUsuario = currentUserFullName  // 🔄 Cambio aquí también
+                )
+                val chatDocRef = db.collection("chats").document(chatId!!)
 
-            val conversationData = mapOf(
-                "participants" to listOf(currentUser.uid, receiverId),
-                "lastMessageText" to texto,
-                "lastMessageTimestamp" to FieldValue.serverTimestamp(),
-                "lastMessageSenderId" to currentUser.uid,
-                "participantNames" to mapOf(
-                    currentUser.uid to (currentUser.displayName ?: "Anónimo"),
-                    receiverId to receiverName
-                ),
-                "lastMessageReadBy" to listOf(currentUser.uid)
-            )
-            batch.set(chatDocRef, conversationData, SetOptions.merge())
+                Log.d("ChatViewModel_Send", "Intentando guardar mensaje en lote...")
+                db.runBatch { batch ->
+                    batch.set(chatDocRef.collection("messages").document(), message)
+
+                    val conversationData = mapOf(
+                        "participants" to listOf(currentUser.uid, receiverId),
+                        "lastMessageText" to texto,
+                        "lastMessageTimestamp" to FieldValue.serverTimestamp(),
+                        "lastMessageSenderId" to currentUser.uid,
+                        "participantNames" to mapOf(
+                            currentUser.uid to currentUserFullName,  // ✅ ARREGLADO
+                            receiverId to receiverName
+                        ),
+                        "lastMessageReadBy" to listOf(currentUser.uid)
+                    )
+                    batch.set(chatDocRef, conversationData, SetOptions.merge())
+                }
+                    .addOnSuccessListener { Log.d("ChatViewModel_Send", "¡ÉXITO! Mensaje guardado.") }
+                    .addOnFailureListener { e -> Log.e("ChatViewModel_Send", "¡FALLO! El lote no se pudo completar.", e) }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel_Send", "Error al cargar perfil del usuario actual", e)
+            }
         }
-            .addOnSuccessListener { Log.d("ChatViewModel_Send", "¡ÉXITO! Mensaje guardado.") }
-            .addOnFailureListener { e -> Log.e("ChatViewModel_Send", "¡FALLO! El lote no se pudo completar.", e) }
     }
 
     override fun onCleared() {

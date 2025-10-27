@@ -12,5 +12,6 @@ data class Service(
     val acceptedBy: String? = null,
     val applicants: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis(),
+    val isRated: Boolean = false,
     val completedAt: Long? = null // 🆕 Timestamp cuando se marcó como completado por el trabajador
 )

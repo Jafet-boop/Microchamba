@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
+import com.example.favoresapp.ui.ViewModels.UserStatsViewModel
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.favoresapp.ui.Model.UserStats
 
 data class BottomNavItem(
     val title: String,
@@ -41,10 +45,12 @@ fun HomeScreen(
     onNavigateToFavorList: () -> Unit = {},
     onNavigateToChat: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToNotifications: () -> Unit = {}
+    onNavigateToNotifications: () -> Unit = {},
+    statsViewModel: UserStatsViewModel = viewModel()
 ) {
     var showContent by remember { mutableStateOf(false) }
-
+    val userStats by statsViewModel.userStats.collectAsState()
+    val isLoading by statsViewModel.isLoading.collectAsState()
     // Animación de entrada
     LaunchedEffect(Unit) {
         delay(200)
@@ -124,7 +130,10 @@ fun HomeScreen(
                     initialOffsetY = { it / 2 }
                 )
             ) {
-                QuickStatsCard()
+                QuickStatsCard(
+                    stats = userStats,
+                    isLoading = isLoading
+                )
             }
 
             Spacer(modifier = Modifier.height(40.dp))
@@ -199,6 +208,7 @@ private fun HeaderSection(
                 Icon(
                     Icons.Default.Notifications,
                     contentDescription = "Notificaciones",
+                    tint = Color(0xFFFFC107),
                     modifier = Modifier.size(30.dp)
                 )
             }
@@ -207,7 +217,10 @@ private fun HeaderSection(
 }
 
 @Composable
-private fun QuickStatsCard() {
+private fun QuickStatsCard(
+    stats: UserStats,
+    isLoading: Boolean
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -235,35 +248,47 @@ private fun QuickStatsCard() {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(
-                    icon = Icons.Default.Favorite,
-                    value = "0",
-                    label = "Favores\nRealizados",
-                    iconColor = Color(0xFFE53E3E)
-                )
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF667eea)
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    StatItem(
+                        icon = Icons.Default.Favorite,
+                        value = stats.favorsCompleted.toString(),
+                        label = "Favores\nRealizados",
+                        iconColor = Color(0xFFE53E3E)
+                    )
 
-                StatItem(
-                    icon = Icons.Default.Star,
-                    value = "0.0",
-                    label = "Calificación\nPromedio",
-                    iconColor = Color(0xFFD69E2E)
-                )
+                    StatItem(
+                        icon = Icons.Default.Star,
+                        value = String.format("%.1f", stats.averageRating),
+                        label = "Calificación\nPromedio",
+                        iconColor = Color(0xFFD69E2E)
+                    )
 
-                StatItem(
-                    icon = Icons.Default.ThumbUp,
-                    value = "0",
-                    label = "Personas\nAyudadas",
-                    iconColor = Color(0xFF38A169)
-                )
+                    StatItem(
+                        icon = Icons.Default.ThumbUp,
+                        value = stats.peopleHelped.toString(),
+                        label = "Personas\nAyudadas",
+                        iconColor = Color(0xFF38A169)
+                    )
+                }
             }
         }
     }
 }
-
 @Composable
 private fun StatItem(
     icon: ImageVector,
