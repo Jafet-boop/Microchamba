@@ -1,10 +1,40 @@
 {
   "project_info": {
     "project_number": "810254494187",
+    "firebase_url": "https://favoresapp-4fe86-default-rtdb.firebaseio.com",
     "project_id": "favoresapp-4fe86",
     "storage_bucket": "favoresapp-4fe86.firebasestorage.app"
   },
   "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:810254494187:android:5440a5ed70a3f461d4d1ae",
+        "android_client_info": {
+          "package_name": "com.NeighTech.favoresapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "810254494187-v5146pppgtii61qlm811e8856t57qcm5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJs4CHyKRfCVqifPcxPMSUtTLbXrkP4nc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "810254494187-v5146pppgtii61qlm811e8856t57qcm5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
     {
       "client_info": {
         "mobilesdk_app_id": "1:810254494187:android:1e99b0e9338baa22d4d1ae",
@@ -13,6 +43,38 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "810254494187-0f8rjoeqbdfoe67e5ot4ja8u127d9ik6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.favoresapp",
+            "certificate_hash": "741dca44351714f915a5c841bc0cbfe9556af2c4"
+          }
+        },
+        {
+          "client_id": "810254494187-2ujlu8g0tdndjtk1aupthjrfd7ufarqr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.favoresapp",
+            "certificate_hash": "2222beb09d6a6e70c44be4b0068b06988f70d377"
+          }
+        },
+        {
+          "client_id": "810254494187-ctm59puvjd9g84693m6q0kni0aodcvnc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.favoresapp",
+            "certificate_hash": "a252fc322e369d72b21ce3f8a694e7e18b09c7ec"
+          }
+        },
+        {
+          "client_id": "810254494187-fqr04l03n8a87tocjujedti4i9951ntl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.favoresapp",
+            "certificate_hash": "1f3c2422d78e5c3bbbcd011834f684116b0478fc"
+          }
+        },
         {
           "client_id": "810254494187-sgimgok8n2pu6htmpb5mskbbg6276kvk.apps.googleusercontent.com",
           "client_type": 1,

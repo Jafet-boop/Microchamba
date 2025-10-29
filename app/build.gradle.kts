@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.favoresapp"
+    namespace = "com.NeighTech.favoresapp"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.favoresapp"
+        applicationId = "com.NeighTech.favoresapp"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
